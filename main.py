@@ -8,6 +8,7 @@ import os
 import cv2
 import time
 from multiprocessing import Manager
+import threading
 
 from pipeline import frame_store
 from pipeline.task import Task, TaskCategory
@@ -15,6 +16,7 @@ from pipeline.queues import CentralTaskQueue
 from pipeline.storage import SQLiteStorage
 from pipeline.scheduler import SchedulerProcess
 from pipeline.dispatcher import DispatcherProcess
+from pipeline.video_reader import VideoReader
 
 from pipeline.categories import *
 
@@ -35,65 +37,6 @@ NUM_CPU_WORKERS=int(os.environ.get("NUM_CPU_WORKERS", 4))
 
 MAX_GPU_BACKLOG=int(os.environ.get("MAX_GPU_BACKLOG", 8))
 MAX_CPU_BACKLOG=int(os.environ.get("MAX_CPU_BACKLOG", 16))
-
-# ==========================================================================================
-# MAIN PIPELINE DRIVER
-# ==========================================================================================
-
-def enqueue_video_frames(video_path: str, queue: CentralTaskQueue, db: SQLiteStorage):
-    """
-    Push each frame of a video into VEHICLE_DETECT tasks.
-    """
-
-    video_id = os.path.splitext(os.path.basename(video_path))[0]
-    log.info(f"[MAIN] Processing video: {video_id}")
-
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        log.warning(f"[MAIN] Failed to open {video_path}")
-        return
-
-    frame_idx = 0
-
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-
-        while queue.total_gpu_backlog() > MAX_GPU_BACKLOG:
-            time.sleep(0.05)
-
-        while queue.total_cpu_backlog() > MAX_CPU_BACKLOG:
-            time.sleep(0.05)
-
-        # ---------------------
-        # Save frame to FrameStore
-        # ---------------------
-        payload_ref = frame_store.save_frame(video_id, frame_idx, frame)
-
-        # ---------------------
-        # Create VEHICLE_DETECT task
-        # ---------------------
-        task = Task(
-            category=TaskCategory.VEHICLE_DETECT,
-            payload=frame,               # immediate GPU processing
-            priority=0,
-            video_id=video_id,
-            frame_idx=frame_idx,
-            meta={
-                "payload_ref": payload_ref,
-                "dependencies": [payload_ref]
-            },
-        )
-
-        task_id = db.save_task(task)
-        queue.push(task_id, task)
-
-        frame_idx += 1
-
-    cap.release()
-    log.info(f"[MAIN] Finished enqueueing {frame_idx} frames for {video_id}")
-
 
 def main():
     # ===========================================================
@@ -117,49 +60,6 @@ def main():
     worker_status = manager.dict()
 
     # ===========================================================
-    # WORKER CATEGORY ASSIGNMENTS
-    # ===========================================================
-
-    gpu_categories = [
-        TaskCategory.VEHICLE_DETECT,
-        TaskCategory.PLATE_DETECT,
-        TaskCategory.OCR
-    ]
-
-    cpu_categories = [
-        TaskCategory.PLATE_SMOOTH,
-        TaskCategory.SUMMARY
-    ]
-
-    # -----------------------------------------------------------
-    # GPU resource loaders / processors
-    # -----------------------------------------------------------
-    gpu_resource_loaders = {
-        TaskCategory.OCR:            load_ocr,
-        TaskCategory.VEHICLE_DETECT: load_vehicle_model,
-        TaskCategory.PLATE_DETECT:   load_plate_model,
-    }
-
-    gpu_processors = {
-        TaskCategory.OCR:            process_ocr,
-        TaskCategory.VEHICLE_DETECT: process_vehicle,
-        TaskCategory.PLATE_DETECT:   process_plate,
-    }
-
-    # -----------------------------------------------------------
-    # CPU resource loaders / processors
-    # -----------------------------------------------------------
-    cpu_resource_loaders = {
-        TaskCategory.PLATE_SMOOTH: load_plate_smoother,
-        TaskCategory.SUMMARY:      load_summary,
-    }
-
-    cpu_processors = {
-        TaskCategory.PLATE_SMOOTH: process_plate_smooth,
-        TaskCategory.SUMMARY:      process_summary,
-    }
-
-    # ===========================================================
     # ENQUEUE ALL VIDEOS IN `inputs/`
     # ===========================================================
 
@@ -173,8 +73,16 @@ def main():
         log.warning("[MAIN] No videos found in inputs/")
         return
 
-    for v in videos:
-        enqueue_video_frames(v, queue, db)
+    readers = [
+        VideoReader(v, queue, db, cpu_backlog_limit=MAX_CPU_BACKLOG, gpu_backlog_limit=MAX_GPU_BACKLOG)
+        for v in videos
+    ]
+
+    threads = []
+    for r in readers:
+        t = threading.Thread(target=r.run, daemon=True)
+        t.start()
+        threads.append(t)
 
     # ===========================================================
     # START WORKERS
