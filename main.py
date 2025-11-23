@@ -1,6 +1,9 @@
 # main.py
 from __future__ import annotations
 
+from dotenv import load_dotenv
+load_dotenv()
+
 import os
 import cv2
 import time
@@ -13,16 +16,7 @@ from pipeline.storage import SQLiteStorage
 from pipeline.scheduler import SchedulerProcess
 from pipeline.dispatcher import DispatcherProcess
 
-# Workers
-from pipeline.workers.cpu_worker_mp import CPUWorkerProcess
-from pipeline.workers.gpu_worker import GPUWorkerProcess
-
-# Processors (mapping categories → functions)
-from pipeline.processors.yolo_vehicle import load_vehicle_model, process_vehicle
-from pipeline.processors.yolo_plate import load_plate_model, process_plate
-from pipeline.processors.ocr import load_ocr, process_ocr
-from pipeline.processors.plate_smooth import load_plate_smoother, process_plate_smooth
-from pipeline.processors.summary import load_summary, process_summary
+from pipeline.categories import *
 
 # Dispatcher handlers
 from pipeline.dispatch_handlers import (
@@ -129,13 +123,13 @@ def main():
     # GPU resource loaders / processors
     # -----------------------------------------------------------
     gpu_resource_loaders = {
-        TaskCategory.OCR:          load_ocr,
+        TaskCategory.OCR:            load_ocr,
         TaskCategory.VEHICLE_DETECT: load_vehicle_model,
         TaskCategory.PLATE_DETECT:   load_plate_model,
     }
 
     gpu_processors = {
-        TaskCategory.OCR:          process_ocr,
+        TaskCategory.OCR:            process_ocr,
         TaskCategory.VEHICLE_DETECT: process_vehicle,
         TaskCategory.PLATE_DETECT:   process_plate,
     }
