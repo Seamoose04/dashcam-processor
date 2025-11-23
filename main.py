@@ -30,6 +30,12 @@ from pipeline.dispatch_handlers import (
 from pipeline.logger import get_logger
 log = get_logger("main")
 
+NUM_GPU_WORKERS=int(os.environ.get("NUM_GPU_WORKERS", 2))
+NUM_CPU_WORKERS=int(os.environ.get("NUM_CPU_WORKERS", 4))
+
+MAX_GPU_BACKLOG=int(os.environ.get("MAX_GPU_BACKLOG", 8))
+MAX_CPU_BACKLOG=int(os.environ.get("MAX_CPU_BACKLOG", 16))
+
 # ==========================================================================================
 # MAIN PIPELINE DRIVER
 # ==========================================================================================
@@ -49,10 +55,16 @@ def enqueue_video_frames(video_path: str, queue: CentralTaskQueue, db: SQLiteSto
 
     frame_idx = 0
 
-    while True and frame_idx < 50:
+    while True:
         ret, frame = cap.read()
         if not ret:
             break
+
+        while queue.total_gpu_backlog() > MAX_GPU_BACKLOG:
+            time.sleep(0.05)
+
+        while queue.total_cpu_backlog() > MAX_CPU_BACKLOG:
+            time.sleep(0.05)
 
         # ---------------------
         # Save frame to FrameStore
@@ -170,7 +182,7 @@ def main():
 
     # GPU worker (1 for now)
     gpu_workers = []
-    for wid in range(12):
+    for wid in range(NUM_GPU_WORKERS):
         w = GPUWorkerProcess(
             worker_id=0 + wid,
             task_queue=queue,
@@ -185,7 +197,7 @@ def main():
 
     # CPU workers (2 recommended)
     cpu_workers = []
-    for wid in range(24):
+    for wid in range(NUM_CPU_WORKERS):
         w = CPUWorkerProcess(
             worker_id=100 + wid,
             task_queue=queue,

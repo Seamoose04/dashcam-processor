@@ -5,7 +5,7 @@ from multiprocessing import Manager, Lock
 from typing import MutableMapping, MutableSequence, Optional, Iterable, Tuple
 
 from pipeline.task import Task, TaskCategory
-
+from pipeline.categories import gpu_categories, cpu_categories
 
 class CentralTaskQueue:
     """
@@ -65,3 +65,9 @@ class CentralTaskQueue:
         """Return {category: backlog_count} for monitoring."""
         with self._lock:
             return {cat: len(q) for cat, q in self._queues.items()}
+
+    def total_gpu_backlog(self):
+        return sum(self.backlog(cat) for cat in gpu_categories)
+
+    def total_cpu_backlog(self):
+        return sum(self.backlog(cat) for cat in cpu_categories)
