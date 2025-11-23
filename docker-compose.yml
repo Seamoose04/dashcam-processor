@@ -1,0 +1,30 @@
+services:
+  finaldb:
+    image: postgres:16
+    container_name: finaldb
+    restart: always
+    environment:
+      POSTGRES_USER: dashcam
+      POSTGRES_PASSWORD: "${DASHPASS}"
+      POSTGRES_DB: dashcam_final
+    ports:
+      - "5432:5432"
+    volumes:
+      - finaldb_data:/var/lib/postgresql/data
+
+  api:
+    build: ./services/api
+    container_name: dashcam_api
+    restart: always
+    depends_on:
+      - finaldb
+    environment:
+      POSTGRES_HOST: finaldb
+      POSTGRES_USER: dashcam
+      POSTGRES_PASSWORD: "${DASHPASS}"
+      POSTGRES_DB: dashcam_final
+    ports:
+      - "8001:8000"
+
+volumes:
+  finaldb_data:

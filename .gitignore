@@ -1,0 +1,10 @@
+logs/*
+frame_store/*
+inputs/*
+pipeline.db
+
+**/__pycache__/*
+venv/*
+
+**/.env*
+!**/env.example
