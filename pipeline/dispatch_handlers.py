@@ -11,8 +11,6 @@ from pipeline import frame_store
 from pipeline.logger import get_logger
 log = get_logger("dispatch_handlers")
 
-from pipeline.writer import writer
-
 # ------------------------------------------------------------------------
 # 0. FAKE CPU (example)
 # ------------------------------------------------------------------------
@@ -30,7 +28,6 @@ def handle_fake_cpu_result(
         f"[Dispatcher] FAKE_CPU_TEST handled (result_id={result_id}, task_id={task_id}) "
         f"result={result_obj}"
     )
-
 
 # ------------------------------------------------------------------------
 # 1. VEHICLE_DETECT → PLATE_DETECT
@@ -86,7 +83,6 @@ def handle_vehicle_detect_result(
             f"[Dispatcher] VEHICLE_DETECT → PLATE_DETECT "
             f"car_bbox={car_bbox} → task_id={downstream_id}"
         )
-
 
 # ------------------------------------------------------------------------
 # 2. PLATE_DETECT → OCR
@@ -239,11 +235,13 @@ def handle_plate_smooth_result(
     payload_ref = task.meta.get("payload_ref")
     video_id = task.video_id
     frame_idx = task.frame_idx
-    car_bbox = task.payload.get("car_bbox")
-    plate_bbox = task.payload.get("plate_bbox")
+    car_bbox = task.meta.get("car_bbox")
+    plate_bbox = task.meta.get("plate_bbox")
     dependencies = task.meta.get("dependencies") or ([payload_ref] if payload_ref else [])
 
+    from pipeline.writer import get_writer
     # Write final plate data into Postgres
+    writer = get_writer()
     writer.write_vehicle(
         video_id=video_id,
         frame_idx=frame_idx,
