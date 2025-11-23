@@ -5,9 +5,6 @@ import psycopg2
 import json
 from datetime import datetime, timezone
 
-from dotenv import load_dotenv
-load_dotenv()
-
 class Writer:
     def __init__(self):
         self.conn = psycopg2.connect(
@@ -55,4 +52,10 @@ class Writer:
             ),
         )
 
-writer = Writer()
+_writer = None
+
+def get_writer():
+    global _writer
+    if _writer is None:
+        _writer = Writer()
+    return _writer
