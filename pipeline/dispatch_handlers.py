@@ -11,6 +11,8 @@ from pipeline import frame_store
 from pipeline.logger import get_logger
 log = get_logger("dispatch_handlers")
 
+from pipeline.writer import writer
+
 # ------------------------------------------------------------------------
 # 0. FAKE CPU (example)
 # ------------------------------------------------------------------------
@@ -241,28 +243,17 @@ def handle_plate_smooth_result(
     plate_bbox = task.payload.get("plate_bbox")
     dependencies = task.meta.get("dependencies") or ([payload_ref] if payload_ref else [])
 
-    new_task = Task(
-        category=TaskCategory.SUMMARY,
-        payload={
-            "final_plate": final_text,
-            "car_bbox": car_bbox,
-            "plate_bbox": plate_bbox,
-            "video_id": video_id,
-            "frame_idx": frame_idx,
-        },
-        priority=0,
+    # Write final plate data into Postgres
+    writer.write_vehicle(
         video_id=video_id,
         frame_idx=frame_idx,
-        meta={
-            "payload_ref": payload_ref,
-            "dependencies": dependencies,    
-        },
+        final_plate=final_text,
+        conf=result_obj.get("conf", 1.0),
+        car_bbox=car_bbox,
+        plate_bbox=plate_bbox,
     )
 
-    downstream_id = db.save_task(new_task)
-    queue.push(downstream_id, new_task)
-
     log.info(
-        f"[Dispatcher] PLATE_SMOOTH → SUMMARY: "
-        f"final_plate='{final_text}' → new_task_id={downstream_id}"
+        f"[SUMMARY → POSTGRES] Plate='{final_text}' "
+        f"video={video_id} frame={frame_idx}"
     )
