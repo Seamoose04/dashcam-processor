@@ -10,8 +10,11 @@ import time
 from multiprocessing import Manager
 import threading
 
+import signal
+from pipeline.shutdown import request_shutdown, is_shutdown
+
 from pipeline import frame_store
-from pipeline.task import Task, TaskCategory
+from pipeline.task import TaskCategory
 from pipeline.queues import CentralTaskQueue
 from pipeline.storage import SQLiteStorage
 from pipeline.scheduler import SchedulerProcess
@@ -37,6 +40,20 @@ NUM_CPU_WORKERS=int(os.environ.get("NUM_CPU_WORKERS", 4))
 
 MAX_GPU_BACKLOG=int(os.environ.get("MAX_GPU_BACKLOG", 8))
 MAX_CPU_BACKLOG=int(os.environ.get("MAX_CPU_BACKLOG", 16))
+
+def handle_sigint(signum, frame):
+    log.info("\n[MAIN] Shutdown requested...")
+    request_shutdown()
+
+signal.signal(signal.SIGINT, handle_sigint)
+signal.signal(signal.SIGTERM, handle_sigint)
+
+handlers = {
+    TaskCategory.VEHICLE_DETECT: handle_vehicle_detect_result,
+    TaskCategory.PLATE_DETECT:   handle_plate_detect_result,
+    TaskCategory.OCR:            handle_ocr_result,
+    TaskCategory.PLATE_SMOOTH:   handle_plate_smooth_result,
+}
 
 def main():
     # ===========================================================
@@ -79,114 +96,112 @@ def main():
     ]
 
     threads = []
-    for r in readers:
-        t = threading.Thread(target=r.run, daemon=True)
-        t.start()
-        threads.append(t)
-
-    # ===========================================================
-    # START WORKERS
-    # ===========================================================
-
-    # GPU worker (1 for now)
     gpu_workers = []
-    for wid in range(NUM_GPU_WORKERS):
-        w = GPUWorkerProcess(
-            worker_id=0 + wid,
-            task_queue=queue,
-            db_path=DB_PATH,
-            gpu_categories=gpu_categories,
-            resource_loaders=gpu_resource_loaders,
-            processors=gpu_processors,
-            worker_status=worker_status,
-        )
-        w.start()
-        gpu_workers.append(w)
-
-    # CPU workers (2 recommended)
     cpu_workers = []
-    for wid in range(NUM_CPU_WORKERS):
-        w = CPUWorkerProcess(
-            worker_id=100 + wid,
-            task_queue=queue,
-            db_path=DB_PATH,
-            cpu_categories=cpu_categories,
-            resource_loaders=cpu_resource_loaders,
-            processors=cpu_processors,
-            worker_status=worker_status,
-        )
-        w.start()
-        cpu_workers.append(w)
-
-    # ===========================================================
-    # START DISPATCHER (downstream task generation)
-    # ===========================================================
-
-    handlers = {
-        TaskCategory.VEHICLE_DETECT: handle_vehicle_detect_result,
-        TaskCategory.PLATE_DETECT:   handle_plate_detect_result,
-        TaskCategory.OCR:            handle_ocr_result,
-        TaskCategory.PLATE_SMOOTH:   handle_plate_smooth_result,
-    }
-
-    dispatcher = DispatcherProcess(
-        db_path=DB_PATH,
-        task_queue=queue,
-        handlers=handlers,
-        interval=0.2,
-    )
-    dispatcher.start()
-
-    # ===========================================================
-    # START SCHEDULER HUD
-    # ===========================================================
 
     scheduler = SchedulerProcess(
         task_queue=queue,
         worker_status=worker_status,
         interval=1.0
     )
-    scheduler.start()
+    dispatcher = DispatcherProcess(
+        db_path=DB_PATH,
+        task_queue=queue,
+        handlers=handlers,
+        interval=0.2,
+    )
 
-    # ===========================================================
-    # WAIT UNTIL ALL TASKS ARE DONE
-    # ===========================================================
+    try:
+        # ===========================================================
+        # START VIDEO READERS
+        # ===========================================================
+        for r in readers:
+            t = threading.Thread(target=r.run, daemon=True)
+            t.start()
+            threads.append(t)
 
-    log.info("[MAIN] Waiting for pipeline to finish...")
+        # ===========================================================
+        # START WORKERS
+        # ===========================================================
 
-    while True:
-        time.sleep(3)
+        # GPU worker (1 for now)
+        for wid in range(NUM_GPU_WORKERS):
+            w = GPUWorkerProcess(
+                worker_id=0 + wid,
+                task_queue=queue,
+                db_path=DB_PATH,
+                gpu_categories=gpu_categories,
+                resource_loaders=gpu_resource_loaders,
+                processors=gpu_processors,
+                worker_status=worker_status,
+            )
+            w.start()
+            gpu_workers.append(w)
 
-        total = queue.total_backlog()
-        active = any(ws.get("category") for ws in worker_status.values())
+        # CPU workers (2 recommended)
+        for wid in range(NUM_CPU_WORKERS):
+            w = CPUWorkerProcess(
+                worker_id=100 + wid,
+                task_queue=queue,
+                db_path=DB_PATH,
+                cpu_categories=cpu_categories,
+                resource_loaders=cpu_resource_loaders,
+                processors=cpu_processors,
+                worker_status=worker_status,
+            )
+            w.start()
+            cpu_workers.append(w)
 
-        if total == 0 and not active:
-            log.info("[MAIN] Pipeline complete: no backlog & workers idle.")
-            break
+        # ===========================================================
+        # START SCHEDULER HUD
+        # ===========================================================
 
-    # ===========================================================
-    # CLEAN SHUTDOWN
-    # ===========================================================
+        dispatcher.start()
+        scheduler.start()
 
-    log.info("[MAIN] Shutting down...")
+        # ===========================================================
+        # WAIT UNTIL ALL TASKS ARE DONE
+        # ===========================================================
 
-    for w in gpu_workers:
-        w.terminate()
-    for w in cpu_workers:
-        w.terminate()
+        log.info("[MAIN] Waiting for pipeline to finish...")
 
-    dispatcher.terminate()
-    scheduler.terminate()
+        while not is_shutdown():
+            time.sleep(3)
 
-    for w in gpu_workers:
-        w.join()
-    for w in cpu_workers:
-        w.join()
+            total = queue.total_backlog()
+            active = any(ws.get("category") for ws in worker_status.values())
 
-    dispatcher.join()
-    scheduler.join()
+            if total == 0 and not active:
+                log.info("[MAIN] Pipeline complete: no backlog & workers idle.")
+                break
 
-    log.info("[MAIN] All done!")
+    except KeyboardInterrupt:
+        handle_sigint(None, None)
+
+    finally:
+        # ===========================================================
+        # CLEAN SHUTDOWN
+        # ===========================================================
+
+        log.info("[MAIN] Shutting down...")
+
+        for w in gpu_workers:
+            w.terminate()
+        for w in cpu_workers:
+            w.terminate()
+
+        dispatcher.terminate()
+        scheduler.terminate()
+
+        for w in gpu_workers:
+            w.join(timeout=2)
+        for w in cpu_workers:
+            w.join(timeout=2)
+
+        dispatcher.join()
+        scheduler.join()
+
+        log.info("[MAIN] All done!")
 
 
 if __name__ == "__main__":

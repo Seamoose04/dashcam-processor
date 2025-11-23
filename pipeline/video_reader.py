@@ -7,6 +7,9 @@ from pipeline.storage import SQLiteStorage
 from pipeline.task import Task, TaskCategory
 from pipeline import frame_store
 
+from pipeline.logger import get_logger
+
+from pipeline.shutdown import is_shutdown
 from categories import gpu_categories, cpu_categories
 
 class VideoReader:
@@ -38,6 +41,8 @@ class VideoReader:
 
         self.cap = cv2.VideoCapture(video_path)
         self.video_id = video_path  # Or generate hash, but path is fine for now
+
+        self.log = get_logger(f"VideoReader-{self.video_id}")
 
         if not self.cap.isOpened():
             raise RuntimeError(f"Failed to open video: {video_path}")
@@ -95,7 +100,7 @@ class VideoReader:
         """
         frame_idx = 0
 
-        while True:
+        while not is_shutdown():
             # Backpressure: pause if overloaded
             if self.gpu_overloaded() or self.cpu_overloaded():
                 time.sleep(self.sleep_interval)
@@ -109,4 +114,4 @@ class VideoReader:
             frame_idx += 1
 
         self.cap.release()
-        print(f"[VideoReader] Finished reading video: {self.video_path}")
+        self.log.info(f"[VideoReader] Finished reading video: {self.video_path}")

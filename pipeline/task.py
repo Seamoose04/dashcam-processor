@@ -26,7 +26,6 @@ class TaskCategory(Enum):
     OCR = "ocr"                       # EasyOCR on plate crops
     PLATE_SMOOTH = "plate_smooth"     # temporal merge of OCR
     SUMMARY = "summary"               # vehicle/plate-level summary
-    FAKE_CPU_TEST = "fake_cpu_test"   # for testing
 
 
 @dataclass

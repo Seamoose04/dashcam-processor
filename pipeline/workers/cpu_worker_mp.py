@@ -9,6 +9,7 @@ from typing import Callable, Dict, Optional, Any, List
 from pipeline.task import Task, TaskCategory
 from pipeline.queues import CentralTaskQueue
 from pipeline.storage import SQLiteStorage
+from pipeline.shutdown import is_shutdown
 
 from pipeline.logger import get_logger
 
@@ -86,7 +87,7 @@ class CPUWorkerProcess(Process):
         self.log.info("Worker starting (multiprocess mode)")
         db = SQLiteStorage(self.db_path)
 
-        while True:
+        while not is_shutdown():
             cat = self._choose_busiest_cpu_category()
             self._update_status(cat)
 
