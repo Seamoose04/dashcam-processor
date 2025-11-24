@@ -12,24 +12,6 @@ from pipeline.logger import get_logger
 log = get_logger("dispatch_handlers")
 
 # ------------------------------------------------------------------------
-# 0. FAKE CPU (example)
-# ------------------------------------------------------------------------
-
-def handle_fake_cpu_result(
-    result_id: int,
-    task_id: int,
-    category: TaskCategory,
-    task: Task,
-    result_obj: Any,
-    db: SQLiteStorage,
-    queue: CentralTaskQueue,
-) -> None:
-    log.info(
-        f"[Dispatcher] FAKE_CPU_TEST handled (result_id={result_id}, task_id={task_id}) "
-        f"result={result_obj}"
-    )
-
-# ------------------------------------------------------------------------
 # 1. VEHICLE_DETECT → PLATE_DETECT
 # ------------------------------------------------------------------------
 
