@@ -35,7 +35,15 @@ Handlers encapsulate the logic for #4 and #5.
 Every handler has the same signature:
 
 ```python
-def handle_<stage>_result(task: Task, result: dict, queue, db):
+def handle_<stage>_result(
+    result_id: int,
+    task_id: int,
+    category: TaskCategory,
+    task: Task,
+    result_obj: dict | list,
+    db: SQLiteStorage,
+    queue: CentralTaskQueue,
+):
     ...
 ````
 
@@ -44,7 +52,7 @@ All handlers MUST:
 ### ✓ Accept:
 
 * `task`: the original Task
-* `result`: the processor output dict (or list)
+* `result_obj`: the processor output dict (or list)
 * `queue`: CentralTaskQueue instance
 * `db`: SQLiteStorage instance
 
@@ -70,7 +78,7 @@ A handler lives inside this loop (Dispatcher):
 for each completed task:
     result = db.fetch_result(task_id)
     handler = handlers[task.category]
-    handler(task, result, queue, db)
+    handler(result_id, task_id, task.category, task, result, db, queue)
     db.mark_dispatched(task_id)
 ```
 
@@ -142,13 +150,14 @@ def handle_vehicle_detect_result(task, result, queue, db):
 
         new_task = Task(
             category=TaskCategory.PLATE_DETECT,
-            payload=task.payload,            # full frame
+            payload={"car_bbox": bbox},  # bbox metadata only; frame is reloaded via payload_ref
             video_id=task.video_id,
             frame_idx=task.frame_idx,
             track_id=track_id,
             meta={
+                "payload_ref": task.meta.get("payload_ref"),
                 "car_bbox": bbox,
-                "parent_task": task.id,
+                "dependencies": task.meta.get("dependencies", []),
             }
         )
 
@@ -169,18 +178,22 @@ def handle_vehicle_detect_result(task, result, queue, db):
 def handle_plate_detect_result(task, result, queue, db):
     # result is a list of plate ROIs with bboxes
     for det in result:
-        roi = det["plate_roi"]
         plate_bbox = det["bbox"]
 
         new_task = Task(
             category=TaskCategory.OCR,
-            payload=roi,                     # small ROI image
+            payload={
+                "plate_bbox": plate_bbox,
+                "car_bbox": task.meta["car_bbox"],
+            },
             video_id=task.video_id,
             frame_idx=task.frame_idx,
             track_id=task.track_id,
             meta={
+                "payload_ref": task.meta.get("payload_ref"),
                 "car_bbox": task.meta["car_bbox"],
                 "plate_bbox": plate_bbox,
+                "dependencies": task.meta.get("dependencies", []),
             }
         )
 
@@ -190,7 +203,7 @@ def handle_plate_detect_result(task, result, queue, db):
 
 ### NOTE:
 
-* Payload now becomes the plate ROI (smaller, good for GPU)
+* Payload stays as bbox metadata; OCR reloads the plate ROI from `frame_store` using `payload_ref`
 * Car bbox is inherited
 * Plate bbox is added
 

@@ -35,7 +35,7 @@ PLATE_DETECT
 OCR
  ↓ (one result per plate)
 PLATE_SMOOTH
- ↓ (after 3+ samples)
+ ↓ (after ≥2 samples per track_id)
 SUMMARY
  ↓
 Final plate written to Postgres
@@ -82,7 +82,7 @@ A GPU worker pops a VEHICLE_DETECT task:
 * Runs YOLO vehicle model
 * Produces a list of detected vehicles (bounding boxes)
 
-Dispatcher receives result and:
+Dispatcher receives result and reloads the original frame from `frame_store` when downstream processors need pixels, then:
 
 * For each vehicle detected, creates a **PLATE_DETECT** task with:
 
@@ -97,6 +97,7 @@ One vehicle → one PLATE_DETECT task.
 
 A GPU worker pops a PLATE_DETECT task:
 
+* Reloads the frame from `frame_store` using `payload_ref`
 * Runs YOLO plate detection inside the car ROI
 * Result is a list of potential plate boxes
 * Dispatcher chooses the highest-confidence plate (if any)
@@ -112,6 +113,7 @@ Dispatcher creates an **OCR** task:
 
 A GPU worker pops the OCR task:
 
+* Reloads the frame from `frame_store` using `payload_ref`
 * Extracts plate ROI
 * Runs model to read text
 * Produces:
@@ -131,14 +133,14 @@ A CPU worker pops the PLATE_SMOOTH task and:
 * Appends (text, conf) pair into a global smoothing cache:
 
   ```python
-  _global_plate_cache[(video_id, car_bbox)].append((text, conf))
+  _global_plate_cache[(video_id, track_id)].append((text, conf))
   ```
 
-* If fewer than 3 samples exist → returns `{ "final": None }`
+* If fewer than 2 samples exist → returns `{ "final": None }`
 
-* If 3+ samples exist → returns `{ "final": best_plate }`
+* If 2+ samples exist → returns `{ "final": best_plate }`
 
-Where `best_plate` is chosen by confidence-weighted voting.
+Where `best_plate` is chosen by confidence-weighted voting, keyed by `(video_id, track_id)`.
 
 Dispatcher then:
 

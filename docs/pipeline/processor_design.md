@@ -204,9 +204,9 @@ Handlers build **new Tasks** using the result:
 * VEHICLE_DETECT → PLATE_DETECT
 * PLATE_DETECT → OCR
 * OCR → PLATE_SMOOTH
-* PLATE_SMOOTH → SUMMARY
+* PLATE_SMOOTH → summary/write path
 
-And finally SUMMARY → write to Postgres.
+Handlers expect payload/meta to include the references needed to reload frames (`payload_ref`, bboxes). PLATE_DETECT and OCR processors read pixels back from `frame_store` using those references; their task.payload only carries bbox metadata, not the actual ROI.
 
 Your processor output must therefore include **all information needed for the handler**.
 
@@ -285,6 +285,8 @@ Never return raw objects (NumPy arrays, YOLO objects).
 ### ❗If your processor is merging outputs across frames
 
 Use `(video_id, track_id)` as the cache key.
+
+For example, plate smoothing emits `{"final": None}` until it has at least two samples for a `(video_id, track_id)` pair, then returns the best consensus plate and confidence.
 
 ---
 
