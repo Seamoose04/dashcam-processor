@@ -208,8 +208,16 @@ def main():
 
         # Workers exit gracefully when they finish their current task
         for w in gpu_workers:
-            w.join(timeout=2)
+            w.join(timeout=5)
         for w in cpu_workers:
+            w.join(timeout=5)
+
+        # Force-terminate any stragglers so we can safely shut down the Manager
+        still_running = [w for w in gpu_workers + cpu_workers if w.is_alive()]
+        for w in still_running:
+            log.warning(f"[MAIN] Forcing worker {w.name} to terminate")
+            w.terminate()
+        for w in still_running:
             w.join(timeout=2)
 
         dispatcher.terminate()
@@ -217,6 +225,7 @@ def main():
         dispatcher.join(timeout=2)
         scheduler.join(timeout=2)
 
+        queue.shutdown()
         log.info("[MAIN] Shutdown complete.")
 
 if __name__ == "__main__":

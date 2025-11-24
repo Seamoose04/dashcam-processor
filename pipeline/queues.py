@@ -17,14 +17,17 @@ class CentralTaskQueue:
         if categories is None:
             categories = list(TaskCategory)
 
-        manager = Manager()
-
         # Use MutableMapping/MutableSequence for type flexibility (ListProxy OK)
+        self._manager = Manager()
         self._queues: MutableMapping[TaskCategory, MutableSequence] = {
-            cat: manager.list() for cat in categories
+            cat: self._manager.list() for cat in categories
         }
 
         self._lock = Lock()
+
+    def shutdown(self) -> None:
+        """Cleanly stop the backing manager process."""
+        self._manager.shutdown()
 
     # ---------------- BASIC OPS ----------------
 

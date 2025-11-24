@@ -9,6 +9,7 @@ from typing import Any
 from pipeline.queues import CentralTaskQueue
 from pipeline.task import TaskCategory
 
+from pipeline.shutdown import terminate
 from pipeline.logger import get_logger
 
 class SchedulerProcess(Process):
@@ -45,7 +46,7 @@ class SchedulerProcess(Process):
         os.system("clear")
 
     def run(self) -> None:
-        while True:
+        while not terminate.is_set():
             try:
                 snapshot = self.task_queue.snapshot()
                 total = sum(snapshot.values())

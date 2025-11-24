@@ -130,4 +130,6 @@ class GPUWorkerProcess(Process):
                 self.log.exception(f"GPU worker crashed on task_id={task_id}: {e}")
                 db.mark_task_done(task_id)
             self._update_status(cat)
+            
         self.worker_status = None
+        self.log.info("Worker terminated.")

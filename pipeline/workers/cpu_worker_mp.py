@@ -119,3 +119,6 @@ class CPUWorkerProcess(Process):
                 self.log.exception(f"CPU worker error on task_id={task_id}: {e}")
                 db.mark_task_done(task_id)
             self._update_status(cat)
+
+        self.worker_status = None
+        self.log.info("Worker terminated.")
