@@ -32,6 +32,7 @@ from pipeline.dispatch_handlers import (
     handle_plate_detect_result,
     handle_ocr_result,
     handle_plate_smooth_result,
+    handle_final_write_result,
 )
 
 # Logger
@@ -56,6 +57,7 @@ handlers = {
     TaskCategory.PLATE_DETECT:   handle_plate_detect_result,
     TaskCategory.OCR:            handle_ocr_result,
     TaskCategory.PLATE_SMOOTH:   handle_plate_smooth_result,
+    TaskCategory.FINAL_WRITE:    handle_final_write_result,
 }
 
 def main():
@@ -196,7 +198,7 @@ def main():
                 log.info("[MAIN] Backlog drained & no active workers.")
                 break
 
-            time.sleep(0.2)
+            time.sleep(1)
 
         # ===========================================================
         # PHASE 3 — Tell workers to exit their loops

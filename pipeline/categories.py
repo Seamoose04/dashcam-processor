@@ -4,6 +4,7 @@ from pipeline.processors.yolo_plate import load_plate_model, process_plate
 from pipeline.processors.ocr import load_ocr, process_ocr
 from pipeline.processors.plate_smooth import load_plate_smoother, process_plate_smooth
 from pipeline.processors.summary import load_summary, process_summary
+from pipeline.processors.final_write import load_final_writer, process_final_writer
 
 from pipeline.task import TaskCategory
 
@@ -15,7 +16,8 @@ gpu_categories = [
 
 cpu_categories = [
     TaskCategory.PLATE_SMOOTH,
-    TaskCategory.SUMMARY
+    TaskCategory.SUMMARY,
+    TaskCategory.FINAL_WRITE,
 ]
 
 # -----------------------------------------------------------
@@ -39,9 +41,11 @@ gpu_processors = {
 cpu_resource_loaders = {
     TaskCategory.PLATE_SMOOTH: load_plate_smoother,
     TaskCategory.SUMMARY:      load_summary,
+    TaskCategory.FINAL_WRITE:  load_final_writer,
 }
 
 cpu_processors = {
     TaskCategory.PLATE_SMOOTH: process_plate_smooth,
     TaskCategory.SUMMARY:      process_summary,
+    TaskCategory.FINAL_WRITE:  process_final_writer,
 }

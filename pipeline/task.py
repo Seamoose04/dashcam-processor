@@ -26,6 +26,7 @@ class TaskCategory(Enum):
     OCR = "ocr"                       # EasyOCR on plate crops
     PLATE_SMOOTH = "plate_smooth"     # temporal merge of OCR
     SUMMARY = "summary"               # vehicle/plate-level summary
+    FINAL_WRITE = "final_write"       # writes finalized data to the external DB
 
 
 @dataclass

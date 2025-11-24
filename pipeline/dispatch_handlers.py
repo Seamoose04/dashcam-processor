@@ -221,19 +221,62 @@ def handle_plate_smooth_result(
     plate_bbox = task.meta.get("plate_bbox")
     dependencies = task.meta.get("dependencies") or ([payload_ref] if payload_ref else [])
 
-    from pipeline.writer import get_writer
-    # Write final plate data into Postgres
-    writer = get_writer()
-    writer.write_vehicle(
+    # Build FINAL_WRITE task to persist results to the external DB
+    new_task = Task(
+        category=TaskCategory.FINAL_WRITE,
+        payload={
+            "table": "vehicles",
+            "record": {
+                "final_plate": final_text,
+                "plate_confidence": result_obj.get("conf", 1.0),
+                "car_bbox": car_bbox,
+                "plate_bbox": plate_bbox,
+            },
+        },
+        priority=0,
         video_id=video_id,
         frame_idx=frame_idx,
-        final_plate=final_text,
-        conf=result_obj.get("conf", 1.0),
-        car_bbox=car_bbox,
-        plate_bbox=plate_bbox,
+        track_id=task.track_id,
+        meta={
+            "payload_ref": payload_ref,
+            "car_bbox": car_bbox,
+            "plate_bbox": plate_bbox,
+            "dependencies": dependencies,
+            "final": final_text,
+            "conf": result_obj.get("conf", 1.0),
+        },
     )
 
+    downstream_id = db.save_task(new_task)
+    queue.push(downstream_id, new_task)
+
     log.info(
-        f"[SUMMARY → POSTGRES] Plate='{final_text}' "
-        f"video={video_id} frame={frame_idx}"
+        f"[PLATE_SMOOTH → FINAL_WRITE] Plate='{final_text}' "
+        f"video={video_id} frame={frame_idx} → new_task_id={downstream_id}"
+    )
+
+
+# ------------------------------------------------------------------------
+# 5. FINAL_WRITE (terminal)
+# ------------------------------------------------------------------------
+
+def handle_final_write_result(
+    result_id: int,
+    task_id: int,
+    category: TaskCategory,
+    task: Task,
+    result_obj: dict,
+    db: SQLiteStorage,
+    queue: CentralTaskQueue,
+) -> None:
+    """
+    Terminal handler: data has been persisted to the final database.
+    """
+    table = result_obj.get("table")
+    video_id = result_obj.get("video_id") or task.video_id
+    frame_idx = result_obj.get("frame_idx") or task.frame_idx
+
+    log.info(
+        f"[FINAL_WRITE] table={table} video={video_id} frame={frame_idx} "
+        f"cols={result_obj.get('columns')}"
     )
