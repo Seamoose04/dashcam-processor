@@ -1,10 +1,8 @@
 # pipeline/shutdown.py
 from threading import Event
 
-shutdown_event = Event()
+# Stop producing new work (VideoReaders, dispatchers stop scheduling)
+stop = Event()
 
-def request_shutdown():
-    shutdown_event.set()
-
-def is_shutdown():
-    return shutdown_event.is_set()
+# After queues drain: tell workers to exit loops and terminate
+terminate = Event()

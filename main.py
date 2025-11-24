@@ -11,7 +11,7 @@ from multiprocessing import Manager
 import threading
 
 import signal
-from pipeline.shutdown import request_shutdown, is_shutdown
+from pipeline.shutdown import stop, terminate
 
 from pipeline import frame_store
 from pipeline.task import TaskCategory
@@ -20,6 +20,9 @@ from pipeline.storage import SQLiteStorage
 from pipeline.scheduler import SchedulerProcess
 from pipeline.dispatcher import DispatcherProcess
 from pipeline.video_reader import VideoReader
+
+from pipeline.workers.cpu_worker_mp import CPUWorkerProcess
+from pipeline.workers.gpu_worker import GPUWorkerProcess
 
 from pipeline.categories import *
 
@@ -42,8 +45,8 @@ MAX_GPU_BACKLOG=int(os.environ.get("MAX_GPU_BACKLOG", 8))
 MAX_CPU_BACKLOG=int(os.environ.get("MAX_CPU_BACKLOG", 16))
 
 def handle_sigint(signum, frame):
-    log.info("\n[MAIN] Shutdown requested...")
-    request_shutdown()
+    log.info("\n[MAIN] Stop requested... finishing queued items...")
+    stop.set()
 
 signal.signal(signal.SIGINT, handle_sigint)
 signal.signal(signal.SIGTERM, handle_sigint)
@@ -72,7 +75,6 @@ def main():
 
     # shared pipeline components
     queue = CentralTaskQueue()
-    db = SQLiteStorage(DB_PATH)
     manager = Manager()
     worker_status = manager.dict()
 
@@ -91,7 +93,7 @@ def main():
         return
 
     readers = [
-        VideoReader(v, queue, db, cpu_backlog_limit=MAX_CPU_BACKLOG, gpu_backlog_limit=MAX_GPU_BACKLOG)
+        VideoReader(v, queue, DB_PATH, cpu_backlog_limit=MAX_CPU_BACKLOG, gpu_backlog_limit=MAX_GPU_BACKLOG)
         for v in videos
     ]
 
@@ -165,7 +167,7 @@ def main():
 
         log.info("[MAIN] Waiting for pipeline to finish...")
 
-        while not is_shutdown():
+        while True:
             time.sleep(3)
 
             total = queue.total_backlog()
@@ -180,29 +182,40 @@ def main():
 
     finally:
         # ===========================================================
-        # CLEAN SHUTDOWN
+        # PHASE 1 — Stop producers (readers)
         # ===========================================================
+        stop.set()
+        log.info("[MAIN] Stop requested. Waiting for backlog to drain...")
 
-        log.info("[MAIN] Shutting down...")
+        # PHASE 2 — Wait for all queued work to be processed
+        while True:
+            backlog = queue.total_backlog()
+            active = any(ws.get("category") for ws in worker_status.values())
 
+            if backlog == 0 and not active:
+                log.info("[MAIN] Backlog drained & no active workers.")
+                break
+
+            time.sleep(0.2)
+
+        # ===========================================================
+        # PHASE 3 — Tell workers to exit their loops
+        # ===========================================================
+        log.info("[MAIN] Terminating workers...")
+        terminate.set()
+
+        # Workers exit gracefully when they finish their current task
         for w in gpu_workers:
-            w.terminate()
+            w.join(timeout=2)
         for w in cpu_workers:
-            w.terminate()
+            w.join(timeout=2)
 
         dispatcher.terminate()
         scheduler.terminate()
+        dispatcher.join(timeout=2)
+        scheduler.join(timeout=2)
 
-        for w in gpu_workers:
-            w.join(timeout=2)
-        for w in cpu_workers:
-            w.join(timeout=2)
-
-        dispatcher.join()
-        scheduler.join()
-
-        log.info("[MAIN] All done!")
-
+        log.info("[MAIN] Shutdown complete.")
 
 if __name__ == "__main__":
     main()

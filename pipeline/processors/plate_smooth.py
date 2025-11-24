@@ -80,8 +80,6 @@ def process_plate_smooth(task, resource):
 
     guesses = _global_plate_cache[key]
 
-    return {"final": task.payload["text"], "conf": task.payload["conf"]}
-
     # If we have 2+ samples, try to generate a stable final
     if len(guesses) >= 2:
         final_guess = _merge_strings(guesses)

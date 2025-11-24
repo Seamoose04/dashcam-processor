@@ -9,7 +9,7 @@ from pipeline.task import Task, TaskCategory
 from pipeline.queues import CentralTaskQueue
 from pipeline.storage import SQLiteStorage
 from pipeline import frame_store
-from pipeline.shutdown import is_shutdown
+from pipeline.shutdown import terminate
 
 from pipeline.logger import get_logger
 
@@ -73,7 +73,7 @@ class DispatcherProcess(Process):
         db = SQLiteStorage(self.db_path)
         self.log.info("Dispatcher started")
 
-        while not is_shutdown():
+        while not terminate.is_set():
             items = db.fetch_unhandled_results(limit=64)
 
             if not items:

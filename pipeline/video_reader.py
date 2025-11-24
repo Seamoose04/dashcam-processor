@@ -1,6 +1,7 @@
 # pipeline/video_reader.py
 import cv2
 import time
+import os
 from typing import Optional, Callable
 from pipeline.queues import CentralTaskQueue
 from pipeline.storage import SQLiteStorage
@@ -9,8 +10,8 @@ from pipeline import frame_store
 
 from pipeline.logger import get_logger
 
-from pipeline.shutdown import is_shutdown
-from categories import gpu_categories, cpu_categories
+from pipeline.shutdown import stop
+from pipeline.categories import gpu_categories, cpu_categories
 
 class VideoReader:
     """
@@ -26,7 +27,7 @@ class VideoReader:
         self,
         video_path: str,
         queue: CentralTaskQueue,
-        db: SQLiteStorage,
+        db_path: str,
         *,
         gpu_backlog_limit: int = 300,
         cpu_backlog_limit: int = 300,
@@ -34,13 +35,13 @@ class VideoReader:
     ):
         self.video_path = video_path
         self.queue = queue
-        self.db = db
+        self.db = SQLiteStorage(db_path)
         self.gpu_backlog_limit = gpu_backlog_limit
         self.cpu_backlog_limit = cpu_backlog_limit
         self.sleep_interval = sleep_interval
 
         self.cap = cv2.VideoCapture(video_path)
-        self.video_id = video_path  # Or generate hash, but path is fine for now
+        self.video_id = os.path.splitext(os.path.basename(self.video_path))[0]  # Or generate hash, but path is fine for now
 
         self.log = get_logger(f"VideoReader-{self.video_id}")
 
@@ -100,7 +101,7 @@ class VideoReader:
         """
         frame_idx = 0
 
-        while not is_shutdown():
+        while not stop.is_set():
             # Backpressure: pause if overloaded
             if self.gpu_overloaded() or self.cpu_overloaded():
                 time.sleep(self.sleep_interval)

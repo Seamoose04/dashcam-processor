@@ -1,7 +1,3 @@
-# Workers
-from pipeline.workers.cpu_worker_mp import CPUWorkerProcess
-from pipeline.workers.gpu_worker import GPUWorkerProcess
-
 # Processors (mapping categories → functions)
 from pipeline.processors.yolo_vehicle import load_vehicle_model, process_vehicle
 from pipeline.processors.yolo_plate import load_plate_model, process_plate
