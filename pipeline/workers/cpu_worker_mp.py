@@ -109,6 +109,7 @@ class CPUWorkerProcess(Process):
                 continue
 
             try:
+                db.mark_task_running(task_id)
                 processor = self.processors[cat]
                 result = processor(task, self.resource)
 

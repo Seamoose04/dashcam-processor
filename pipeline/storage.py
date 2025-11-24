@@ -134,6 +134,11 @@ class SQLiteStorage:
         self.cursor.execute("UPDATE tasks SET status='done' WHERE id=?", (task_id,))
         self.conn.commit()
 
+    def mark_task_running(self, task_id: int):
+        """Mark a task as running once a worker pops it from the queue."""
+        self.cursor.execute("UPDATE tasks SET status='running' WHERE id=?", (task_id,))
+        self.conn.commit()
+
     # ---------------- Results ----------------
 
     def save_result(self, task_id: int, result: Any):
@@ -195,6 +200,69 @@ class SQLiteStorage:
     def mark_result_handled(self, result_id: int):
         self.cursor.execute("UPDATE results SET handled = 1 WHERE id=?", (result_id,))
         self.conn.commit()
+
+    # -------- Backlog helpers --------
+
+    def count_tasks_by_category(
+        self,
+        categories: list[TaskCategory] | None = None,
+        statuses: tuple[str, ...] = ("queued", "running"),
+    ) -> dict[TaskCategory, int]:
+        """
+        Return {TaskCategory: count} for requested categories (or all), filtered by status.
+        Default counts both queued and running tasks so we see in-flight work.
+        """
+        params: list = list(statuses)
+        where_parts = ["status IN ({})".format(",".join("?" for _ in statuses))]
+
+        if categories:
+            where_parts.append("category IN ({})".format(",".join("?" for _ in categories)))
+            params.extend(cat.value for cat in categories)
+
+        where = " AND ".join(where_parts)
+
+        self.cursor.execute(f"""
+            SELECT category, COUNT(*)
+            FROM tasks
+            WHERE {where}
+            GROUP BY category
+        """, params)
+
+        rows = self.cursor.fetchall()
+        counts: dict[TaskCategory, int] = {}
+        for cat, cnt in rows:
+            counts[TaskCategory(cat)] = cnt
+        return counts
+
+    def count_unhandled_results_by_category(
+        self,
+        categories: list[TaskCategory] | None = None,
+    ) -> dict[TaskCategory, int]:
+        """
+        Return {TaskCategory: count_of_unhandled_results} for the given categories
+        (or all categories if None).
+        Useful to detect result backlog that has not yet been dispatched into downstream tasks.
+        """
+        params: list = []
+        where = ""
+        if categories:
+            where = "WHERE t.category IN ({})".format(",".join("?" for _ in categories))
+            params.extend(cat.value for cat in categories)
+
+        self.cursor.execute(f"""
+            SELECT t.category, COUNT(*)
+            FROM results r
+            JOIN tasks t ON r.task_id = t.id
+            WHERE r.handled = 0
+            {('AND ' + where[6:]) if where else ''}
+            GROUP BY t.category
+        """, params)
+
+        rows = self.cursor.fetchall()
+        counts: dict[TaskCategory, int] = {}
+        for cat, cnt in rows:
+            counts[TaskCategory(cat)] = cnt
+        return counts
 
     def has_other_active_or_unhandled_dependents(
         self,

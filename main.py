@@ -41,12 +41,21 @@ log = get_logger("main")
 
 NUM_GPU_WORKERS=int(os.environ.get("NUM_GPU_WORKERS", 2))
 NUM_CPU_WORKERS=int(os.environ.get("NUM_CPU_WORKERS", 4))
+NUM_DISPATCHERS=int(os.environ.get("NUM_DISPATCHERS", 1))
+DISPATCH_FETCH_LIMIT=int(os.environ.get("DISPATCH_FETCH_LIMIT", 32))
 
 MAX_GPU_BACKLOG=int(os.environ.get("MAX_GPU_BACKLOG", 8))
 MAX_CPU_BACKLOG=int(os.environ.get("MAX_CPU_BACKLOG", 16))
 
+_QUEUE_REF: CentralTaskQueue | None = None  # set once queue is created so SIGINT handler can log it
+
 def handle_sigint(signum, frame):
     log.info("\n[MAIN] Stop requested... finishing queued items...")
+    # Snapshot backlog at the exact moment Ctrl+C arrives to debug sudden queue spikes.
+    if _QUEUE_REF is not None:
+        snap = _QUEUE_REF.snapshot()
+        total = sum(snap.values())
+        log.info("[MAIN] Backlog snapshot on SIGINT: total=%s %s", total, snap)
     stop.set()
 
 signal.signal(signal.SIGINT, handle_sigint)
@@ -68,6 +77,14 @@ def main():
     INPUT_DIR = "inputs"
     DB_PATH = "pipeline.db"
 
+    log.info(
+        "[CONFIG] gpu_workers=%s cpu_workers=%s gpu_backlog_limit=%s cpu_backlog_limit=%s",
+        NUM_GPU_WORKERS,
+        NUM_CPU_WORKERS,
+        MAX_GPU_BACKLOG,
+        MAX_CPU_BACKLOG,
+    )
+
     # remove old DB for a clean run
     if os.path.exists(DB_PATH):
         os.remove(DB_PATH)
@@ -77,6 +94,8 @@ def main():
 
     # shared pipeline components
     queue = CentralTaskQueue()
+    global _QUEUE_REF
+    _QUEUE_REF = queue
     manager = Manager()
     worker_status = manager.dict()
 
@@ -106,14 +125,20 @@ def main():
     scheduler = SchedulerProcess(
         task_queue=queue,
         worker_status=worker_status,
-        interval=1.0
-    )
-    dispatcher = DispatcherProcess(
+        interval=1.0,
         db_path=DB_PATH,
-        task_queue=queue,
-        handlers=handlers,
-        interval=0.2,
     )
+    dispatchers = [
+        DispatcherProcess(
+            db_path=DB_PATH,
+            task_queue=queue,
+            handlers=handlers,
+            interval=0.05,
+            name=f"Dispatcher-{i}",
+            fetch_limit=DISPATCH_FETCH_LIMIT,
+        )
+        for i in range(NUM_DISPATCHERS)
+    ]
 
     try:
         # ===========================================================
@@ -160,7 +185,8 @@ def main():
         # START SCHEDULER HUD
         # ===========================================================
 
-        dispatcher.start()
+        for d in dispatchers:
+            d.start()
         scheduler.start()
 
         # ===========================================================
@@ -220,9 +246,11 @@ def main():
         for w in still_running:
             w.join(timeout=2)
 
-        dispatcher.terminate()
+        for d in dispatchers:
+            d.terminate()
         scheduler.terminate()
-        dispatcher.join(timeout=2)
+        for d in dispatchers:
+            d.join(timeout=2)
         scheduler.join(timeout=2)
 
         queue.shutdown()

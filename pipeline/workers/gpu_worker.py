@@ -117,6 +117,7 @@ class GPUWorkerProcess(Process):
                 continue
 
             try:
+                db.mark_task_running(task_id)
                 # Process the task with the already-loaded model/resource
                 processor = self.processors[cat]
                 with suppress_stdout():

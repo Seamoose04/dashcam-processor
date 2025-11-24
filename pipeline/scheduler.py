@@ -5,6 +5,7 @@ import os
 import time
 from multiprocessing import Process
 from typing import Any
+import signal
 
 from pipeline.queues import CentralTaskQueue
 from pipeline.task import TaskCategory
@@ -32,6 +33,7 @@ class SchedulerProcess(Process):
         task_queue: CentralTaskQueue,
         worker_status: Any,             # Manager().dict()
         interval: float = 1.0,
+        db_path: str = "pipeline.db",
         name: str = "Scheduler",
     ):
         super().__init__()
@@ -39,6 +41,7 @@ class SchedulerProcess(Process):
         self.worker_status = worker_status
         self.interval = interval
         self.name = name
+        self.db_path = db_path
         self.log = get_logger(self.name)
 
     def _clear_screen(self) -> None:
@@ -46,20 +49,47 @@ class SchedulerProcess(Process):
         os.system("clear")
 
     def run(self) -> None:
+        # Ignore Ctrl+C in this process; main coordinates shutdown via events.
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        # Local DB connection for backlog counts (queued + running)
+        from pipeline.storage import SQLiteStorage
+        db = SQLiteStorage(self.db_path)
+
         while not terminate.is_set():
             try:
-                snapshot = self.task_queue.snapshot()
-                total = sum(snapshot.values())
+                active_counts = db.count_tasks_by_category()
+                total_active = sum(active_counts.values())
+                queue_snapshot = self.task_queue.snapshot()
 
                 self._clear_screen()
                 print(f"[{self.name}] Queue and Worker Status")
                 print("=" * 50)
-                print(f"Total queued tasks: {total}")
+                result_backlog = db.count_unhandled_results_by_category()
+                total_results = sum(result_backlog.values())
+
+                print(f"Active (queued+running) tasks: {total_active}")
+                print(f"Undispatched results: {total_results}")
+                print(f"In-queue counts (may be 0 while workers run): {queue_snapshot}")
+                # In-flight workers by category (derived from heartbeats)
+                inflight = {}
+                for status in self.worker_status.values():
+                    cat_val = status.get("category")
+                    if cat_val:
+                        inflight[cat_val] = inflight.get(cat_val, 0) + 1
+                print(f"Workers active by category: {inflight}")
                 print("\nPer-category backlog:")
+                self.log.info(
+                    "[HUD] active_total=%s active_by_cat=%s result_backlog=%s queue_snapshot=%s inflight=%s",
+                    total_active,
+                    active_counts,
+                    result_backlog,
+                    queue_snapshot,
+                    inflight,
+                )
 
                 # Ensure stable order
                 for cat in TaskCategory:
-                    count = snapshot.get(cat, 0)
+                    count = active_counts.get(cat, 0)
                     print(f"  {cat.value:15s} : {count}")
 
                 print("\nWorkers:")

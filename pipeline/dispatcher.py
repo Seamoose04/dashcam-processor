@@ -4,6 +4,7 @@ from __future__ import annotations
 import time
 from multiprocessing import Process
 from typing import Any, Callable, Dict
+import signal
 
 from pipeline.task import Task, TaskCategory
 from pipeline.queues import CentralTaskQueue
@@ -30,8 +31,9 @@ class DispatcherProcess(Process):
         db_path: str,
         task_queue: CentralTaskQueue,
         handlers: Dict[TaskCategory, ResultHandler],
-        interval: float = 0.5,
+        interval: float = 0.05,
         name: str = "Dispatcher",
+        fetch_limit: int = 1024,
     ):
         super().__init__()
         self.db_path = db_path
@@ -39,6 +41,7 @@ class DispatcherProcess(Process):
         self.handlers = handlers
         self.interval = interval
         self.name = name
+        self.fetch_limit = fetch_limit
 
         self.log = get_logger(self.name)
 
@@ -70,28 +73,34 @@ class DispatcherProcess(Process):
                     self.log.exception(f"[DISPATCHER] Failed to delete frame {payload_ref}: {e}")
 
     def run(self) -> None:
+        # Keep running through Ctrl+C sent to the process group; main handles shutdown via events.
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
         db = SQLiteStorage(self.db_path)
         self.log.info("Dispatcher started")
 
         while not terminate.is_set():
-            items = db.fetch_unhandled_results(limit=64)
+            drained_any = False
+            while True:
+                items = db.fetch_unhandled_results(limit=self.fetch_limit)
+                if not items:
+                    break
 
-            if not items:
-                time.sleep(self.interval)
-                continue
+                drained_any = True
+                for result_id, task_id, category, task, result_obj in items:
+                    handler = self.handlers.get(category)
+                    if handler is not None:
+                        try:
+                            handler(result_id, task_id, category, task, result_obj, db, self.task_queue)
+                        except Exception as e:
+                            self.log.exception(f"Dispatcher handler failed on task_id={task_id}: {e}")
 
-            for result_id, task_id, category, task, result_obj in items:
-                handler = self.handlers.get(category)
-                if handler is not None:
+                    # Always mark handled to avoid infinite retries
+                    db.mark_result_handled(result_id)
+                    
                     try:
-                        handler(result_id, task_id, category, task, result_obj, db, self.task_queue)
+                        self._cleanup_frames_for_task(db, task_id, task)
                     except Exception as e:
-                        self.log.exception(f"Dispatcher handler failed on task_id={task_id}: {e}")
+                        self.log.exception(f"Dispatcher cleanup failed for task_id={task_id}: {e}")
 
-                # Always mark handled to avoid infinite retries
-                db.mark_result_handled(result_id)
-                
-                try:
-                    self._cleanup_frames_for_task(db, task_id, task)
-                except Exception as e:
-                    self.log.exception(f"Dispatcher cleanup failed for task_id={task_id}: {e}")
+            if not drained_any:
+                time.sleep(self.interval)
