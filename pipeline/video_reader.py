@@ -86,6 +86,9 @@ class VideoReader:
             meta={
                 "payload_ref": payload_ref,
                 "dependencies": dependencies,
+                "video_path": self.video_path,
+                "video_filename": os.path.basename(self.video_path),
+                "video_ts_frame": frame_idx,
             },
         )
 

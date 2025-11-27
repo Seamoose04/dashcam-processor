@@ -11,6 +11,15 @@ from pipeline import frame_store
 from pipeline.logger import get_logger
 log = get_logger("dispatch_handlers")
 
+_PASS_THROUGH_META_KEYS = ("video_path", "video_filename", "video_ts_frame")
+
+
+def _merge_meta(task: Task, updates: dict) -> dict:
+    """Carry forward shared metadata like video path while overriding stage-specific fields."""
+    base = {k: task.meta[k] for k in _PASS_THROUGH_META_KEYS if k in task.meta}
+    base.update(updates)
+    return base
+
 
 def push_with_backpressure(queue: CentralTaskQueue, task_id: int, task: Task) -> None:
     """
@@ -61,12 +70,15 @@ def handle_vehicle_detect_result(
             video_id=video_id,
             frame_idx=frame_idx,
             track_id=track_id if track_id is not None else task.track_id,
-            meta={
-                "payload_ref": payload_ref,
-                "car_bbox": car_bbox,
-                "dependencies": dependencies,
-                "track_id": track_id if track_id is not None else task.track_id,
-            },
+            meta=_merge_meta(
+                task,
+                {
+                    "payload_ref": payload_ref,
+                    "car_bbox": car_bbox,
+                    "dependencies": dependencies,
+                    "track_id": track_id if track_id is not None else task.track_id,
+                },
+            ),
         )
 
         downstream_id = -1  # id unused in pure in-memory mode
@@ -127,12 +139,15 @@ def handle_plate_detect_result(
         video_id=video_id,
         frame_idx=frame_idx,
         track_id=task.track_id,
-        meta={
-            "payload_ref": payload_ref,
-            "car_bbox": car_bbox,
-            "plate_bbox": plate_bbox,
-            "dependencies": dependencies,
-        },
+        meta=_merge_meta(
+            task,
+            {
+                "payload_ref": payload_ref,
+                "car_bbox": car_bbox,
+                "plate_bbox": plate_bbox,
+                "dependencies": dependencies,
+            },
+        ),
     )
 
     frame_store.add_refs(dependencies)
@@ -194,12 +209,15 @@ def handle_ocr_result(
         video_id=video_id,
         frame_idx=frame_idx,
         track_id=task.track_id,
-        meta={
-            "payload_ref": payload_ref,
-            "car_bbox": car_bbox,
-            "plate_bbox": plate_bbox,
-            "dependencies": dependencies,
-        },
+        meta=_merge_meta(
+            task,
+            {
+                "payload_ref": payload_ref,
+                "car_bbox": car_bbox,
+                "plate_bbox": plate_bbox,
+                "dependencies": dependencies,
+            },
+        ),
     )
 
     frame_store.add_refs(dependencies)
@@ -257,14 +275,17 @@ def handle_plate_smooth_result(
         video_id=video_id,
         frame_idx=frame_idx,
         track_id=task.track_id,
-        meta={
-            "payload_ref": payload_ref,
-            "car_bbox": car_bbox,
-            "plate_bbox": plate_bbox,
-            "dependencies": dependencies,
-            "final": final_text,
-            "conf": result_obj.get("conf", 1.0),
-        },
+        meta=_merge_meta(
+            task,
+            {
+                "payload_ref": payload_ref,
+                "car_bbox": car_bbox,
+                "plate_bbox": plate_bbox,
+                "dependencies": dependencies,
+                "final": final_text,
+                "conf": result_obj.get("conf", 1.0),
+            },
+        ),
     )
 
     frame_store.add_refs(dependencies)

@@ -19,7 +19,7 @@ The pipeline uses a fixed set of `TaskCategory` values:
 ## CPU Categories
 
 * **PLATE_SMOOTH** — temporal smoothing across frames
-* **SUMMARY** — (optional) post-aggregation or finalization stage
+* **FINAL_WRITE** — terminal stage that writes to Postgres
 
 ---
 
@@ -36,12 +36,12 @@ OCR
  ↓ (one result per plate)
 PLATE_SMOOTH
  ↓ (after ≥2 samples per track_id)
-SUMMARY
+FINAL_WRITE
  ↓
-Final plate written to Postgres
+Row written to Postgres
 ```
 
-All intermediate outputs are stored in SQLite and fed through the **Dispatcher**.
+Intermediate outputs stay in memory (frames on disk via `frame_store`). Handlers enqueue downstream tasks directly—no SQLite hop.
 
 ---
 
@@ -77,17 +77,12 @@ A `VideoReader` thread reads one frame at a time and:
 
 # 4. VEHICLE_DETECT → PLATE_DETECT
 
-A GPU worker pops a VEHICLE_DETECT task:
+GPU worker → YOLO vehicle model → list of detected vehicles (bounding boxes).
 
-* Runs YOLO vehicle model
-* Produces a list of detected vehicles (bounding boxes)
+For each vehicle detected, the handler creates a **PLATE_DETECT** task with:
 
-Dispatcher receives result and reloads the original frame from `frame_store` when downstream processors need pixels, then:
-
-* For each vehicle detected, creates a **PLATE_DETECT** task with:
-
-  * car bounding box
-  * same dependencies
+* car bounding box
+* same dependencies
 
 One vehicle → one PLATE_DETECT task.
 
@@ -97,15 +92,9 @@ One vehicle → one PLATE_DETECT task.
 
 A GPU worker pops a PLATE_DETECT task:
 
-* Reloads the frame from `frame_store` using `payload_ref`
 * Runs YOLO plate detection inside the car ROI
 * Result is a list of potential plate boxes
-* Dispatcher chooses the highest-confidence plate (if any)
-
-Dispatcher creates an **OCR** task:
-
-* Includes both car_bbox and plate_bbox
-* Same dependency list
+* Handler chooses the highest-confidence plate (if any) and creates an **OCR** task that includes car_bbox + plate_bbox and the same dependency list
 
 ---
 
@@ -113,7 +102,6 @@ Dispatcher creates an **OCR** task:
 
 A GPU worker pops the OCR task:
 
-* Reloads the frame from `frame_store` using `payload_ref`
 * Extracts plate ROI
 * Runs model to read text
 * Produces:
@@ -122,7 +110,7 @@ A GPU worker pops the OCR task:
   { "text": "ABC123", "conf": 0.92 }
   ```
 
-Dispatcher receives result and enqueues a **PLATE_SMOOTH** task.
+Handler enqueues a **PLATE_SMOOTH** task.
 
 ---
 
@@ -142,25 +130,25 @@ A CPU worker pops the PLATE_SMOOTH task and:
 
 Where `best_plate` is chosen by confidence-weighted voting, keyed by `(video_id, track_id)`.
 
-Dispatcher then:
+Handler then:
 
-* If `final` is not None → enqueues a SUMMARY task
-* Else → just marks result handled
+* If `final` is not None → enqueues a FINAL_WRITE task
+* Else → just returns (waiting for more samples)
 
 ---
 
-# 8. SUMMARY → Postgres
+# 8. FINAL_WRITE → Postgres
 
-A CPU worker pops SUMMARY:
+A CPU worker pops FINAL_WRITE:
 
-* Performs any final aggregation
-* Calls `writer.write_vehicle()` to insert a row into Postgres:
+* Normalizes the payload, backfills IDs/metadata (video path, filename, frame timestamp)
+* Calls the shared writer to insert a row into Postgres:
 
 ```
-INSERT INTO vehicles (video_id, frame_idx, ts, final_plate, ...)
+INSERT INTO vehicles (video_id, frame_idx, video_ts_frame, video_path, video_filename, ts, final_plate, ...)
 ```
 
-Dispatcher marks result handled.
+Handler is terminal—no downstream tasks.
 
 ---
 
@@ -185,7 +173,7 @@ Each worker follows the same pattern:
 2. Load model/resources on category switch
 3. Pop task
 4. Process it
-5. Write result to SQLite
+5. Run handler to enqueue downstream tasks or write to Postgres
 6. Update worker_status
 
 Workers stop cleanly when `terminate.is_set()` becomes True.

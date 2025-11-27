@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, timezone
 from typing import Any, Dict, Tuple
 
@@ -44,6 +45,11 @@ def _build_record(task, payload: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
         record.setdefault("frame_idx", task.frame_idx)
     if task.track_id is not None:
         record.setdefault("track_id", task.track_id)
+    if "video_ts_frame" not in record:
+        if "video_ts_frame" in task.meta:
+            record["video_ts_frame"] = task.meta["video_ts_frame"]
+        elif task.frame_idx is not None:
+            record["video_ts_frame"] = task.frame_idx
 
     # Bring forward often-needed metadata if present.
     for field in ("car_bbox", "plate_bbox"):
@@ -59,6 +65,15 @@ def _build_record(task, payload: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
             record["plate_confidence"] = meta_conf
         elif "conf" in payload:
             record["plate_confidence"] = payload["conf"]
+    if "video_path" not in record and "video_path" in task.meta:
+        record["video_path"] = task.meta["video_path"]
+    if "video_filename" not in record:
+        if "video_filename" in task.meta:
+            record["video_filename"] = task.meta["video_filename"]
+        elif "video_path" in record:
+            record["video_filename"] = os.path.basename(record["video_path"])
+        elif "video_path" in task.meta:
+            record["video_filename"] = os.path.basename(task.meta["video_path"])
 
     # Vehicles table defaults/validation
     if table == "vehicles":

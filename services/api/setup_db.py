@@ -43,6 +43,9 @@ CREATE TABLE IF NOT EXISTS vehicles (
     video_id TEXT NOT NULL,
     frame_idx INTEGER NOT NULL,
     ts TIMESTAMPTZ NOT NULL,
+    video_ts_frame INTEGER,
+    video_path TEXT,
+    video_filename TEXT,
 
     final_plate TEXT NOT NULL,
     plate_confidence REAL,
@@ -68,6 +71,10 @@ cur.execute("""
 # Ensure newer columns exist even if table was created before this script was updated.
 cur.execute("ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS track_id INTEGER;")
 cur.execute("CREATE INDEX IF NOT EXISTS vehicles_track_idx ON vehicles(track_id);")
+cur.execute("ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS video_ts_frame INTEGER;")
+cur.execute("ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS video_path TEXT;")
+cur.execute("ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS video_filename TEXT;")
+cur.execute("CREATE INDEX IF NOT EXISTS vehicles_video_idx ON vehicles(video_id);")
 
 # -----------------------------------------------------------------------------
 # DONE

@@ -27,6 +27,10 @@ class Writer:
         car_bbox,
         plate_bbox,
         timestamp=None,
+        *,
+        video_ts_frame=None,
+        video_path=None,
+        video_filename=None,
     ):
         """
         Insert a completed recognition result into final Postgres DB.
@@ -45,6 +49,16 @@ class Writer:
             "car_bbox": car_bbox,
             "plate_bbox": plate_bbox,
         }
+
+        if video_ts_frame is None:
+            video_ts_frame = frame_idx
+        record["video_ts_frame"] = video_ts_frame
+
+        if video_path is not None:
+            record["video_path"] = video_path
+
+        if video_filename is not None:
+            record["video_filename"] = video_filename
 
         self.write_record("vehicles", record)
 

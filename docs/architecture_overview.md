@@ -12,7 +12,7 @@ The pipeline is designed to:
 * Use GPUs efficiently for heavy workloads (vehicle + plate detection, OCR)
 * Use CPUs for lightweight tasks (plate smoothing, summary)
 * Stream frames from video incrementally (not loading entire videos into RAM)
-* Persist tasks + results in SQLite
+* Keep tasks/results in-memory while avoiding RAM blowups via frame_store
 * Write final plates and metadata to Postgres
 * Coordinate multiple worker processes cleanly
 * Support graceful shutdown without leaving processes hanging
@@ -26,11 +26,11 @@ VideoReader Threads
         ↓
    CentralTaskQueue
         ↓
-   GPU Workers  ←→ SQLite (tasks + results)
+   GPU Workers
         ↓
-   CPU Workers  ←→ SQLite (tasks + results)
+   CPU Workers
         ↓
-   Dispatcher → (final results) → Postgres
+   Final Writer → Postgres
         ↑
 Scheduler (HUD, worker monitor)
 ```
@@ -41,12 +41,8 @@ Scheduler (HUD, worker monitor)
 * **CentralTaskQueue** (in-memory) stores all enqueued tasks in per-category buckets.
 * **GPU workers** run YOLO models and OCR (vehicle → plate → OCR).
 * **CPU workers** run smoothing and summary tasks.
-* **SQLiteStorage** is the source of truth for:
-
-  * tasks table
-  * results table
-  * dependency-based cleanup
-* **DispatcherProcess** reads unhandled results from SQLite and schedules downstream tasks.
+* **Frame store** persists frames to disk while tasks move through memory.
+* **Dispatcher logic** lives inside the worker handlers; downstream tasks are created directly.
 * **SchedulerProcess** is a HUD that prints queue sizes + worker states.
 * **Postgres Writer** stores final plate events (`vehicles` table).
 
@@ -57,7 +53,7 @@ Scheduler (HUD, worker monitor)
 Each task moves through these stages:
 
 ```
-QUEUED → RUNNING → DONE → (result saved) → DISPATCHED → DOWNSTREAM TASKS
+QUEUED → RUNNING → HANDLER → DOWNSTREAM TASKS
 ```
 
 ### Dependencies
@@ -71,9 +67,9 @@ Each task stores:
 }
 ```
 
-* `payload_ref` identifies the stored frame.
+* `payload_ref` identifies the stored frame on disk.
 * `dependencies` tracks all upstream frames used to produce this result.
-* When a task result is handled, the dispatcher checks if any other tasks still depend on the frame. If not → `frame_store.delete_frame()`.
+* When a task result is handled, the dispatcher logic checks if any other tasks still depend on the frame. If not → `frame_store.delete_frame()`.
 
 ---
 
@@ -112,14 +108,14 @@ Each category has its own FIFO bucket. Workers pop from their categories only.
 * Choose busiest GPU category
 * Load YOLO / OCR models per-category
 * Run processors (`process_vehicle`, `process_plate`, `process_ocr`)
-* Write results to SQLite
+* Immediately call a handler to enqueue downstream CPU/GPU work
 
 ## 6.2 CPU Workers
 
 * Dedicated to: `PLATE_SMOOTH`, `SUMMARY`
 * Choose busiest CPU category
 * Load lightweight resources
-* Write results to SQLite
+* Run processors, call handlers, and hand off to the next stage or final writer
 
 ### Worker Status
 
@@ -137,52 +133,24 @@ Used by Scheduler HUD.
 
 ---
 
-# 7. Dispatcher
+# 7. Dispatch Flow
 
-Runs every ~0.2 seconds.
+No separate dispatcher process now. Worker handlers directly create downstream tasks and release frame references once work is safely enqueued.
 
-Steps:
+Flow per category:
 
-1. `fetch_unhandled_results()` from SQLite
-2. For each result, call category-specific handler:
+* VEHICLE_DETECT → PLATE_DETECT (per vehicle)
+* PLATE_DETECT → OCR (best plate)
+* OCR → PLATE_SMOOTH (per plate)
+* PLATE_SMOOTH → FINAL_WRITE (persist to Postgres)
 
-   * VEHICLE_DETECT → PLATE_DETECT
-   * PLATE_DETECT → OCR
-   * OCR → PLATE_SMOOTH
-   * PLATE_SMOOTH → SUMMARY → Postgres
-3. Mark result handled
-4. Check dependencies and delete frames
-
-Dispatcher is the heart of flow control.
+Handlers also release frame references so `frame_store` can delete images when nothing else depends on them.
 
 ---
 
 # 8. Database Architecture
 
-## SQLite (`pipeline.db`)
-
-* **tasks** table
-* **results** table
-* Dependency-based cleanup
-* One SQLite connection per process
-
-## Postgres (`dashcam_final`)
-
-`vehicles` table:
-
-```
-id SERIAL PRIMARY KEY
-video_id TEXT
-frame_idx INTEGER
-ts TIMESTAMPTZ
-final_plate TEXT
-plate_confidence FLOAT
-car_bbox JSONB
-plate_bbox JSONB
-created_at TIMESTAMPTZ DEFAULT now()
-```
-
-Used for query/search later.
+Only Postgres is used for persistence. See `docs/db_schema.md` for the full table definition including video path + frame timestamp columns.
 
 ---
 
