@@ -3,12 +3,12 @@ from __future__ import annotations
 
 import os
 import time
+import signal
 from multiprocessing import Process
 from typing import Callable, Dict, List, Optional, Any
 
 from pipeline.task import Task, TaskCategory
 from pipeline.queues import CentralTaskQueue
-from pipeline.storage import SQLiteStorage
 from pipeline.shutdown import terminate
 
 from pipeline.silence import silence_ultralytics, suppress_stdout
@@ -30,10 +30,10 @@ class GPUWorkerProcess(Process):
         self,
         worker_id: int,
         task_queue: CentralTaskQueue,
-        db_path: str,
         gpu_categories: List[TaskCategory],
         resource_loaders: Dict[TaskCategory, Callable[[], Any]],
         processors: Dict[TaskCategory, Callable[[Task, Any], Any]],
+        handlers: Dict[TaskCategory, Callable[[Task, Any, CentralTaskQueue], None]],
         worker_status: Optional[Any] = None,  # Manager().dict()
         name: Optional[str] = None,
     ):
@@ -42,11 +42,11 @@ class GPUWorkerProcess(Process):
         self.name = name or f"GPUWorker-{worker_id}"
 
         self.task_queue = task_queue
-        self.db_path = db_path
 
         self.gpu_categories = gpu_categories
         self.resource_loaders = resource_loaders
         self.processors = processors
+        self.handlers = handlers
         self.worker_status = worker_status
 
         self.current_category: Optional[TaskCategory] = None
@@ -86,10 +86,11 @@ class GPUWorkerProcess(Process):
     def run(self) -> None:
         """
         Main loop for the GPU worker process.
-        Each worker opens its own SQLite connection.
         """
+        # Ignore Ctrl+C in workers; main process coordinates shutdown via events.
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
         self.log.info("GPU worker starting (multiprocess mode)")
-        db = SQLiteStorage(self.db_path)
 
         silence_ultralytics()
 
@@ -117,20 +118,24 @@ class GPUWorkerProcess(Process):
                 continue
 
             try:
-                db.mark_task_running(task_id)
                 # Process the task with the already-loaded model/resource
                 processor = self.processors[cat]
                 with suppress_stdout():
                     result = processor(task, self.resource)
 
-                # Store result
-                db.save_result(task_id, result)
-                db.mark_task_done(task_id)
-                self.log.info(f"Completed GPU task_id={task_id} cat={cat.value}")
+                handler = self.handlers.get(cat)
+                if handler is not None:
+                    handler(task, result, self.task_queue)
+                self.log.info(f"Completed GPU task cat={cat.value}")
             except Exception as e:
-                self.log.exception(f"GPU worker crashed on task_id={task_id}: {e}")
-                db.mark_task_done(task_id)
+                self.log.exception(f"GPU worker crashed on cat={cat.value}: {e}")
+            finally:
+                deps = task.meta.get("dependencies") or []
+                if deps:
+                    from pipeline import frame_store
+                    frame_store.release_refs(deps)
             self._update_status(cat)
             
+        self._update_status(None)
         self.worker_status = None
         self.log.info("Worker terminated.")

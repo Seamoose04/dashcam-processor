@@ -39,6 +39,7 @@ print("[SETUP] Creating vehicles table...")
 cur.execute("""
 CREATE TABLE IF NOT EXISTS vehicles (
     id SERIAL PRIMARY KEY,
+    track_id INTEGER,
     video_id TEXT NOT NULL,
     frame_idx INTEGER NOT NULL,
     ts TIMESTAMPTZ NOT NULL,
@@ -64,6 +65,9 @@ cur.execute("""
     CREATE INDEX IF NOT EXISTS vehicles_plate_trgm_idx 
     ON vehicles USING GIN (final_plate gin_trgm_ops);
 """)
+# Ensure newer columns exist even if table was created before this script was updated.
+cur.execute("ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS track_id INTEGER;")
+cur.execute("CREATE INDEX IF NOT EXISTS vehicles_track_idx ON vehicles(track_id);")
 
 # -----------------------------------------------------------------------------
 # DONE

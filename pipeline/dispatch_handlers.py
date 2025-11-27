@@ -2,26 +2,34 @@
 from __future__ import annotations
 
 from typing import Any, List, Tuple
+import time
 
 from pipeline.task import Task, TaskCategory
 from pipeline.queues import CentralTaskQueue
-from pipeline.storage import SQLiteStorage
 from pipeline import frame_store
 
 from pipeline.logger import get_logger
 log = get_logger("dispatch_handlers")
+
+
+def push_with_backpressure(queue: CentralTaskQueue, task_id: int, task: Task) -> None:
+    """
+    Enqueue with hard-limit awareness; waits until space is available.
+    """
+    while not queue.push(task_id, task):
+        log.warning(
+            "[Enqueue] Queue %s at hard limit — pausing before retry",
+            task.category.value,
+        )
+        time.sleep(0.01)
 
 # ------------------------------------------------------------------------
 # 1. VEHICLE_DETECT → PLATE_DETECT
 # ------------------------------------------------------------------------
 
 def handle_vehicle_detect_result(
-    result_id: int,
-    task_id: int,
-    category: TaskCategory,
     task: Task,
     result_obj: List[dict],
-    db: SQLiteStorage,
     queue: CentralTaskQueue,
 ) -> None:
     """
@@ -38,8 +46,10 @@ def handle_vehicle_detect_result(
     # Dependencies from parent (or fallback to just this frame)
     dependencies = task.meta.get("dependencies") or ([payload_ref] if payload_ref else [])
 
+    spawned = 0
     for det in result_obj:
         car_bbox = det["bbox"]
+        track_id = det.get("track_id") if isinstance(det, dict) else None
 
         # Build PLATE_DETECT task (ROI created by GPU worker)
         new_task = Task(
@@ -50,33 +60,34 @@ def handle_vehicle_detect_result(
             priority=0,
             video_id=video_id,
             frame_idx=frame_idx,
-            track_id=task.track_id,
+            track_id=track_id if track_id is not None else task.track_id,
             meta={
                 "payload_ref": payload_ref,
                 "car_bbox": car_bbox,
                 "dependencies": dependencies,
+                "track_id": track_id if track_id is not None else task.track_id,
             },
         )
 
-        downstream_id = db.save_task(new_task)
-        queue.push(downstream_id, new_task)
+        downstream_id = -1  # id unused in pure in-memory mode
+        frame_store.add_refs(dependencies)
+        push_with_backpressure(queue, downstream_id, new_task)
+        spawned += 1
 
         log.info(
             f"[Dispatcher] VEHICLE_DETECT → PLATE_DETECT "
             f"car_bbox={car_bbox} → task_id={downstream_id}"
         )
+    # Release the current task's dependency once we've spawned downstream tasks.
+    # Downstream tasks hold the dependency; release occurs when they finish.
 
 # ------------------------------------------------------------------------
 # 2. PLATE_DETECT → OCR
 # ------------------------------------------------------------------------
 
 def handle_plate_detect_result(
-    result_id: int,
-    task_id: int,
-    category: TaskCategory,
     task: Task,
     result_obj: List[dict],
-    db: SQLiteStorage,
     queue: CentralTaskQueue,
 ) -> None:
     """
@@ -93,7 +104,12 @@ def handle_plate_detect_result(
     dependencies = task.meta.get("dependencies") or ([payload_ref] if payload_ref else [])
 
     if not result_obj:
-        log.info(f"[Dispatcher] PLATE_DETECT: no plates for task_id={task_id}")
+        log.info(
+            "[Dispatcher] PLATE_DETECT: no plates for video=%s frame=%s",
+            video_id,
+            frame_idx,
+        )
+        # No downstream work; current task will be released by worker after handler returns.
         return
 
     # Choose the *best* plate detection (highest confidence)
@@ -119,13 +135,17 @@ def handle_plate_detect_result(
         },
     )
 
-    downstream_id = db.save_task(new_task)
-    queue.push(downstream_id, new_task)
+    frame_store.add_refs(dependencies)
+    push_with_backpressure(queue, -1, new_task)
 
     log.info(
-        f"[Dispatcher] PLATE_DETECT → OCR "
-        f"plate_bbox={plate_bbox} → new_task_id={downstream_id}"
+        "[Dispatcher] PLATE_DETECT → OCR plate_bbox=%s video=%s frame=%s",
+        plate_bbox,
+        video_id,
+        frame_idx,
     )
+    # Release the current task's dependency after spawning downstream work.
+    # Release happens when this task completes (worker handles it).
 
 
 # ------------------------------------------------------------------------
@@ -133,12 +153,8 @@ def handle_plate_detect_result(
 # ------------------------------------------------------------------------
 
 def handle_ocr_result(
-    result_id: int,
-    task_id: int,
-    category: TaskCategory,
     task: Task,
     result_obj: dict,
-    db: SQLiteStorage,
     queue: CentralTaskQueue,
 ) -> None:
     """
@@ -152,7 +168,11 @@ def handle_ocr_result(
     conf = result_obj.get("conf", 0.0)
 
     if not text:
-        log.info(f"[Dispatcher] OCR: empty result for task_id={task_id}")
+        log.info(
+            "[Dispatcher] OCR: empty result for video=%s frame=%s",
+            task.video_id,
+            task.frame_idx,
+        )
         return
 
     payload_ref = task.meta.get("payload_ref")
@@ -182,13 +202,17 @@ def handle_ocr_result(
         },
     )
 
-    downstream_id = db.save_task(new_task)
-    queue.push(downstream_id, new_task)
+    frame_store.add_refs(dependencies)
+    push_with_backpressure(queue, -1, new_task)
 
     log.info(
-        f"[Dispatcher] OCR → PLATE_SMOOTH "
-        f"text='{text}' conf={conf:.2f} → new_task_id={downstream_id}"
+        "[Dispatcher] OCR → PLATE_SMOOTH text='%s' conf=%.2f video=%s frame=%s",
+        text,
+        conf,
+        video_id,
+        frame_idx,
     )
+    # Release happens when this task completes (worker handles it).
 
 
 # ------------------------------------------------------------------------
@@ -196,12 +220,8 @@ def handle_ocr_result(
 # ------------------------------------------------------------------------
 
 def handle_plate_smooth_result(
-    result_id: int,
-    task_id: int,
-    category: TaskCategory,
     task: Task,
     result_obj: dict,
-    db: SQLiteStorage,
     queue: CentralTaskQueue,
 ) -> None:
     """
@@ -247,13 +267,16 @@ def handle_plate_smooth_result(
         },
     )
 
-    downstream_id = db.save_task(new_task)
-    queue.push(downstream_id, new_task)
+    frame_store.add_refs(dependencies)
+    push_with_backpressure(queue, -1, new_task)
 
     log.info(
-        f"[PLATE_SMOOTH → FINAL_WRITE] Plate='{final_text}' "
-        f"video={video_id} frame={frame_idx} → new_task_id={downstream_id}"
+        "[PLATE_SMOOTH → FINAL_WRITE] Plate='%s' video=%s frame=%s",
+        final_text,
+        video_id,
+        frame_idx,
     )
+    # Release happens when this task completes (worker handles it).
 
 
 # ------------------------------------------------------------------------
@@ -261,12 +284,8 @@ def handle_plate_smooth_result(
 # ------------------------------------------------------------------------
 
 def handle_final_write_result(
-    result_id: int,
-    task_id: int,
-    category: TaskCategory,
     task: Task,
     result_obj: dict,
-    db: SQLiteStorage,
     queue: CentralTaskQueue,
 ) -> None:
     """
@@ -276,7 +295,10 @@ def handle_final_write_result(
     video_id = result_obj.get("video_id") or task.video_id
     frame_idx = result_obj.get("frame_idx") or task.frame_idx
 
+    payload_ref = task.meta.get("payload_ref")
     log.info(
         f"[FINAL_WRITE] table={table} video={video_id} frame={frame_idx} "
         f"cols={result_obj.get('columns')}"
     )
+    dependencies = task.meta.get("dependencies") or []
+    # Release happens when this task completes (worker handles it).

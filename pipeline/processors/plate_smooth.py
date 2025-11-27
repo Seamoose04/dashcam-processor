@@ -70,8 +70,17 @@ def process_plate_smooth(task, resource):
     vid = task.video_id
     tid = task.track_id  # MUCH more stable than bbox
 
-    text = task.meta.get("text")
-    conf = task.meta.get("conf")
+    # OCR data arrives in the task payload; prefer that over meta.
+    text = None
+    conf = None
+    if isinstance(task.payload, dict):
+        text = task.payload.get("text")
+        conf = task.payload.get("conf")
+    # Fallback for any legacy callers that still set meta.
+    if text is None:
+        text = task.meta.get("text")
+    if conf is None:
+        conf = task.meta.get("conf")
 
     key = (vid, tid)
 

@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import os
-from typing import Optional
+from typing import Optional, Iterable
+from multiprocessing import Lock as MpLock
 
 import numpy as np
 
@@ -10,11 +11,15 @@ from pipeline.logger import get_logger
 log = get_logger("framestore")
 
 _BASE_DIR: Optional[str] = None
+_refcounts = None  # Manager().dict expected
+_lock: Optional[MpLock] = None
 
-def init(base_dir: str = "frame_store") -> None:
-    """Initialize the frame store base directory."""
-    global _BASE_DIR
+def init(base_dir: str = "frame_store", refcounts=None, lock: Optional[MpLock] = None) -> None:
+    """Initialize the frame store base directory and shared refcounts."""
+    global _BASE_DIR, _refcounts, _lock
     _BASE_DIR = base_dir
+    _refcounts = refcounts
+    _lock = lock
     os.makedirs(_BASE_DIR, exist_ok=True)
 
 
@@ -68,3 +73,41 @@ def delete_frame(payload_ref: str):
     folder = os.path.dirname(path)
     if os.path.exists(folder) and not os.listdir(folder):
         os.rmdir(folder)
+
+
+def add_refs(refs: Iterable[str]) -> None:
+    """Increment reference counts for payload refs (shared across processes)."""
+    if _refcounts is None or _lock is None:
+        return
+    with _lock:
+        for ref in refs:
+            if ref is None:
+                continue
+            current = _refcounts.get(ref, 0)
+            _refcounts[ref] = current + 1
+            log.info("[FrameStore] add_ref %s -> %s", ref, _refcounts[ref])
+
+
+def release_refs(refs: Iterable[str]) -> None:
+    """Decrement reference counts; delete frames whose count reaches zero."""
+    if _refcounts is None or _lock is None:
+        return
+    to_delete = []
+    with _lock:
+        for ref in refs:
+            if ref is None:
+                continue
+            current = _refcounts.get(ref, 0)
+            if current <= 1:
+                _refcounts.pop(ref, None)
+                to_delete.append(ref)
+            else:
+                _refcounts[ref] = current - 1
+            log.info("[FrameStore] release_ref %s -> %s", ref, _refcounts.get(ref, 0))
+
+    for ref in to_delete:
+        try:
+            delete_frame(ref)
+            log.info("[FrameStore] Deleted %s (refcount=0)", ref)
+        except Exception as e:
+            log.exception(f"[FrameStore] Failed to delete {ref}: {e}")

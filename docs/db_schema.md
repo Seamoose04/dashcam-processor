@@ -146,6 +146,7 @@ It contains one core table so far:
 ```
 CREATE TABLE vehicles (
     id SERIAL PRIMARY KEY,
+    track_id INTEGER,
     video_id TEXT NOT NULL,
     frame_idx INTEGER NOT NULL,
     ts TIMESTAMPTZ NOT NULL,
@@ -162,6 +163,7 @@ CREATE TABLE vehicles (
 | Column               | Meaning                                            |
 | -------------------- | -------------------------------------------------- |
 | **id**               | Unique row identifier                              |
+| **track_id**         | Optional stable vehicle track ID (from detector)   |
 | **video_id**         | Source video identifier                            |
 | **frame_idx**        | Frame number where this plate was observed         |
 | **ts**               | Timestamp of event (frame time or processing time) |

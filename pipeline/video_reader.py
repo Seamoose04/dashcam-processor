@@ -4,7 +4,6 @@ import time
 import os
 from typing import Optional, Callable
 from pipeline.queues import CentralTaskQueue
-from pipeline.storage import SQLiteStorage
 from pipeline.task import Task, TaskCategory
 from pipeline import frame_store
 
@@ -27,7 +26,6 @@ class VideoReader:
         self,
         video_path: str,
         queue: CentralTaskQueue,
-        db_path: str,
         *,
         gpu_backlog_limit: int = 300,
         cpu_backlog_limit: int = 300,
@@ -35,7 +33,6 @@ class VideoReader:
     ):
         self.video_path = video_path
         self.queue = queue
-        self.db = SQLiteStorage(db_path)
         self.gpu_backlog_limit = gpu_backlog_limit
         self.cpu_backlog_limit = cpu_backlog_limit
         self.sleep_interval = sleep_interval
@@ -51,44 +48,19 @@ class VideoReader:
         # Track when we enter/exit backpressure to avoid log spam.
         self._gpu_blocked = False
         self._cpu_blocked = False
+        self._last_block_state: tuple[bool, bool] = (False, False)
 
     # ---------------------------------------------------------
     # Backpressure helpers
     # ---------------------------------------------------------
 
-    def _active_backlog(self, categories) -> int:
-        """
-        Count queued + running tasks per category from SQLite.
-        """
-        counts = self.db.count_tasks_by_category(categories)
-        return sum(counts.get(cat, 0) for cat in categories)
-
-    def _result_backlog(self, categories) -> int:
-        """
-        Count unhandled results per category (work completed by a worker but not yet dispatched).
-        """
-        counts = self.db.count_unhandled_results_by_category(categories)
-        return sum(counts.get(cat, 0) for cat in categories)
-
     def gpu_overloaded(self) -> bool:
-        """Return True if GPU work (queued + in-flight + undispatched results) exceeds limit."""
-        total = self._active_backlog(gpu_categories) + self._result_backlog(gpu_categories)
-        return total > self.gpu_backlog_limit
+        """Return True if GPU work exceeds limit."""
+        return self.queue.total_gpu_backlog() > self.gpu_backlog_limit
 
     def cpu_overloaded(self) -> bool:
-        """Return True if CPU work (queued + in-flight + undispatched results) exceeds limit."""
-        total = self._active_backlog(cpu_categories) + self._result_backlog(cpu_categories)
-        return total > self.cpu_backlog_limit
-
-    def total_overloaded(self) -> bool:
-        """
-        Return True if combined GPU+CPU work (queued + running + undispatched results)
-        exceeds the stricter of the two limits. This prevents runaway total load even
-        if one side stays under its individual threshold.
-        """
-        gpu_total = self._active_backlog(gpu_categories) + self._result_backlog(gpu_categories)
-        cpu_total = self._active_backlog(cpu_categories) + self._result_backlog(cpu_categories)
-        return (gpu_total + cpu_total) > max(self.gpu_backlog_limit, self.cpu_backlog_limit)
+        """Return True if CPU work exceeds limit."""
+        return self.queue.total_cpu_backlog() > self.cpu_backlog_limit
 
     # ---------------------------------------------------------
     # Push frame into pipeline
@@ -100,6 +72,8 @@ class VideoReader:
         """
         # Store frame in frame_store
         payload_ref = frame_store.save_frame(self.video_id, frame_idx, frame)
+        dependencies = [payload_ref]
+        frame_store.add_refs(dependencies)
 
         # Build vehicle detection task
         task = Task(
@@ -111,12 +85,17 @@ class VideoReader:
             track_id=None,
             meta={
                 "payload_ref": payload_ref,
-                "dependencies": [payload_ref],
+                "dependencies": dependencies,
             },
         )
 
-        task_id = self.db.save_task(task)
-        self.queue.push(task_id, task)
+        # Backpressure-aware enqueue: block if the category hits its hard limit.
+        while not self.queue.push(-1, task):
+            self.log.warning(
+                "[Enqueue] Queue %s at hard limit — pausing before retry",
+                task.category.value,
+            )
+            time.sleep(self.sleep_interval)
 
     # ---------------------------------------------------------
     # Main loop
@@ -136,46 +115,53 @@ class VideoReader:
 
             gpu_blocked = gpu_backlog > self.gpu_backlog_limit
             cpu_blocked = cpu_backlog > self.cpu_backlog_limit
-            total_blocked = self.total_overloaded()
 
-            if gpu_blocked and not self._gpu_blocked:
-                self.log.info(
-                    "[Backpressure] GPU backlog %s exceeds limit %s — pausing reads",
-                    gpu_backlog,
-                    self.gpu_backlog_limit,
-                )
-            if not gpu_blocked and self._gpu_blocked:
-                self.log.info(
-                    "[Backpressure] GPU backlog recovered to %s/%s — resuming reads",
-                    gpu_backlog,
-                    self.gpu_backlog_limit,
-                )
-            if cpu_blocked and not self._cpu_blocked:
-                self.log.info(
-                    "[Backpressure] CPU backlog %s exceeds limit %s — pausing reads",
-                    cpu_backlog,
-                    self.cpu_backlog_limit,
-                )
-            if not cpu_blocked and self._cpu_blocked:
-                self.log.info(
-                    "[Backpressure] CPU backlog recovered to %s/%s — resuming reads",
-                    cpu_backlog,
-                    self.cpu_backlog_limit,
-                )
+            state = (gpu_blocked, cpu_blocked)
+            if state != self._last_block_state:
+                if gpu_blocked and not self._last_block_state[0]:
+                    self.log.info(
+                        "[Backpressure] GPU backlog %s exceeds limit %s — pausing reads",
+                        gpu_backlog,
+                        self.gpu_backlog_limit,
+                    )
+                if not gpu_blocked and self._last_block_state[0]:
+                    self.log.info(
+                        "[Backpressure] GPU backlog recovered to %s/%s — resuming reads",
+                        gpu_backlog,
+                        self.gpu_backlog_limit,
+                    )
 
-            if total_blocked and not (self._gpu_blocked or self._cpu_blocked):
-                self.log.info(
-                    "[Backpressure] TOTAL backlog gpu=%s cpu=%s exceeds limit %s — pausing reads",
-                    gpu_backlog + cpu_backlog,
-                    cpu_backlog,
-                    max(self.gpu_backlog_limit, self.cpu_backlog_limit),
-                )
-            if not total_blocked and (self._gpu_blocked or self._cpu_blocked):
-                # Don't double-log if per-lane already logged resume; keep it simple.
-                pass
+                if cpu_blocked and not self._last_block_state[1]:
+                    self.log.info(
+                        "[Backpressure] CPU backlog %s exceeds limit %s — pausing reads",
+                        cpu_backlog,
+                        self.cpu_backlog_limit,
+                    )
+                if not cpu_blocked and self._last_block_state[1]:
+                    self.log.info(
+                        "[Backpressure] CPU backlog recovered to %s/%s — resuming reads",
+                        cpu_backlog,
+                        self.cpu_backlog_limit,
+                    )
 
-            self._gpu_blocked = gpu_blocked or total_blocked
-            self._cpu_blocked = cpu_blocked or total_blocked
+                # Clarify cross-state when one recovers but the other is still blocking.
+                if not gpu_blocked and self._last_block_state[0] and cpu_blocked:
+                    self.log.info(
+                        "[Backpressure] GPU backlog recovered but CPU still blocked (%s/%s) — keeping reads paused",
+                        cpu_backlog,
+                        self.cpu_backlog_limit,
+                    )
+                if not cpu_blocked and self._last_block_state[1] and gpu_blocked:
+                    self.log.info(
+                        "[Backpressure] CPU backlog recovered but GPU still blocked (%s/%s) — keeping reads paused",
+                        gpu_backlog,
+                        self.gpu_backlog_limit,
+                    )
+
+            self._last_block_state = state
+
+            self._gpu_blocked = gpu_blocked
+            self._cpu_blocked = cpu_blocked
 
             if self._gpu_blocked or self._cpu_blocked:
                 time.sleep(self.sleep_interval)
