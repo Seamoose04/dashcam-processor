@@ -11,7 +11,7 @@ from pipeline import frame_store
 from pipeline.logger import get_logger
 log = get_logger("dispatch_handlers")
 
-_PASS_THROUGH_META_KEYS = ("video_path", "video_filename", "video_ts_frame")
+_PASS_THROUGH_META_KEYS = ("video_path", "video_filename", "video_ts_frame", "global_id")
 
 
 def _merge_meta(task: Task, updates: dict) -> dict:
@@ -59,6 +59,7 @@ def handle_vehicle_detect_result(
     for det in result_obj:
         car_bbox = det["bbox"]
         track_id = det.get("track_id") if isinstance(det, dict) else None
+        global_id = f"{video_id}:{track_id}" if track_id is not None else None
 
         # Build PLATE_DETECT task (ROI created by GPU worker)
         new_task = Task(
@@ -77,6 +78,7 @@ def handle_vehicle_detect_result(
                     "car_bbox": car_bbox,
                     "dependencies": dependencies,
                     "track_id": track_id if track_id is not None else task.track_id,
+                    "global_id": global_id,
                 },
             ),
         )
@@ -90,6 +92,34 @@ def handle_vehicle_detect_result(
             f"[Dispatcher] VEHICLE_DETECT → PLATE_DETECT "
             f"car_bbox={car_bbox} → task_id={downstream_id}"
         )
+
+    # Also enqueue a VEHICLE_TRACK task for kinematics on CPU (one per frame).
+    track_task = Task(
+        category=TaskCategory.VEHICLE_TRACK,
+        payload=result_obj,
+        priority=0,
+        video_id=video_id,
+        frame_idx=frame_idx,
+        track_id=None,
+        meta=_merge_meta(
+            task,
+            {
+                "payload_ref": payload_ref,
+                "dependencies": dependencies,
+                "fps": task.meta.get("fps"),
+                "video_fps": task.meta.get("video_fps"),
+                "video_ts_ms": task.meta.get("video_ts_ms"),
+            },
+        ),
+    )
+    frame_store.add_refs(dependencies)
+    push_with_backpressure(queue, -1, track_task)
+    log.info(
+        "[Dispatcher] VEHICLE_DETECT → VEHICLE_TRACK video=%s frame=%s detections=%s",
+        video_id,
+        frame_idx,
+        len(result_obj),
+    )
     # Release the current task's dependency once we've spawned downstream tasks.
     # Downstream tasks hold the dependency; release occurs when they finish.
 
@@ -146,6 +176,7 @@ def handle_plate_detect_result(
                 "car_bbox": car_bbox,
                 "plate_bbox": plate_bbox,
                 "dependencies": dependencies,
+                "global_id": task.meta.get("global_id"),
             },
         ),
     )
@@ -161,6 +192,108 @@ def handle_plate_detect_result(
     )
     # Release the current task's dependency after spawning downstream work.
     # Release happens when this task completes (worker handles it).
+
+
+# ------------------------------------------------------------------------
+# 2b. VEHICLE_TRACK → FINAL_WRITE (tracks + motion)
+# ------------------------------------------------------------------------
+
+def handle_vehicle_track_result(
+    task: Task,
+    result_obj: List[dict],
+    queue: CentralTaskQueue,
+) -> None:
+    """
+    result_obj = [
+      {
+        "global_id": "video:track",
+        "track_id": int,
+        "video_id": str,
+        "frame_idx": int,
+        "video_ts_frame": int,
+        "video_ts_ms": float | None,
+        "bbox": [...],
+        "vx": float,
+        "vy": float,
+        "speed_px_s": float,
+        "heading_deg": float,
+        "age": int,
+        "conf": float,
+        "is_new": bool,
+      },
+      ...
+    ]
+    """
+    if not result_obj:
+        return
+
+    payload_ref = task.meta.get("payload_ref")
+    dependencies = task.meta.get("dependencies") or ([payload_ref] if payload_ref else [])
+
+    for track in result_obj:
+        # One-time mapping per track_id → global_id
+        if track.get("is_new"):
+            track_index_task = Task(
+                category=TaskCategory.FINAL_WRITE,
+                payload={
+                    "table": "tracks",
+                    "record": {
+                        "global_id": track.get("global_id"),
+                        "video_id": track.get("video_id") or task.video_id,
+                        "track_id": track.get("track_id"),
+                        "first_frame_idx": track.get("frame_idx"),
+                        "video_ts_frame": track.get("video_ts_frame"),
+                        "video_ts_ms": track.get("video_ts_ms"),
+                        "video_path": task.meta.get("video_path"),
+                        "video_filename": task.meta.get("video_filename"),
+                    },
+                },
+                priority=0,
+                video_id=task.video_id,
+                frame_idx=task.frame_idx,
+                track_id=track.get("track_id"),
+                meta=_merge_meta(task, {"dependencies": dependencies, "payload_ref": payload_ref}),
+            )
+            frame_store.add_refs(dependencies)
+            push_with_backpressure(queue, -1, track_index_task)
+
+        motion_task = Task(
+            category=TaskCategory.FINAL_WRITE,
+            payload={
+                "table": "track_motion",
+                "record": {
+                    "global_id": track.get("global_id"),
+                    "track_id": track.get("track_id"),
+                    "video_id": track.get("video_id") or task.video_id,
+                    "frame_idx": track.get("frame_idx"),
+                    "video_ts_frame": track.get("video_ts_frame"),
+                    "video_ts_ms": track.get("video_ts_ms"),
+                    "bbox": track.get("bbox"),
+                    "vx": track.get("vx"),
+                    "vy": track.get("vy"),
+                    "speed_px_s": track.get("speed_px_s"),
+                    "heading_deg": track.get("heading_deg"),
+                    "age_frames": track.get("age"),
+                    "conf": track.get("conf"),
+                    "video_path": task.meta.get("video_path"),
+                    "video_filename": task.meta.get("video_filename"),
+                },
+            },
+            priority=0,
+            video_id=task.video_id,
+            frame_idx=task.frame_idx,
+            track_id=track.get("track_id"),
+            meta=_merge_meta(task, {"dependencies": dependencies, "payload_ref": payload_ref}),
+        )
+        frame_store.add_refs(dependencies)
+        push_with_backpressure(queue, -1, motion_task)
+
+    log.info(
+        "[Dispatcher] VEHICLE_TRACK → FINAL_WRITE motions=%s video=%s frame=%s",
+        len(result_obj),
+        task.video_id,
+        task.frame_idx,
+    )
 
 
 # ------------------------------------------------------------------------
@@ -216,6 +349,7 @@ def handle_ocr_result(
                 "car_bbox": car_bbox,
                 "plate_bbox": plate_bbox,
                 "dependencies": dependencies,
+                "global_id": task.meta.get("global_id"),
             },
         ),
     )
@@ -269,6 +403,7 @@ def handle_plate_smooth_result(
                 "plate_confidence": result_obj.get("conf", 1.0),
                 "car_bbox": car_bbox,
                 "plate_bbox": plate_bbox,
+                "global_id": task.meta.get("global_id"),
             },
         },
         priority=0,
@@ -284,6 +419,7 @@ def handle_plate_smooth_result(
                 "dependencies": dependencies,
                 "final": final_text,
                 "conf": result_obj.get("conf", 1.0),
+                "global_id": task.meta.get("global_id"),
             },
         ),
     )

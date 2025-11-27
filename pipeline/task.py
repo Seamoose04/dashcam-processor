@@ -22,6 +22,7 @@ class TaskCategory(Enum):
     etc.
     """
     VEHICLE_DETECT = "vehicle_yolo"   # YOLOv8 on full frame
+    VEHICLE_TRACK = "vehicle_track"   # CPU kinematics on detected vehicles
     PLATE_DETECT = "plate_yolo"       # YOLOv8 on car ROI
     OCR = "ocr"                       # EasyOCR on plate crops
     PLATE_SMOOTH = "plate_smooth"     # temporal merge of OCR

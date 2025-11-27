@@ -39,6 +39,7 @@ class VideoReader:
 
         self.cap = cv2.VideoCapture(video_path)
         self.video_id = os.path.splitext(os.path.basename(self.video_path))[0]  # Or generate hash, but path is fine for now
+        self.fps = float(self.cap.get(cv2.CAP_PROP_FPS) or 0.0) or 30.0
 
         self.log = get_logger(f"VideoReader-{self.video_id}")
 
@@ -66,7 +67,7 @@ class VideoReader:
     # Push frame into pipeline
     # ---------------------------------------------------------
 
-    def enqueue_frame(self, frame_idx: int, frame):
+    def enqueue_frame(self, frame_idx: int, frame, *, ts_ms: Optional[float] = None):
         """
         Stores frame → pushes VEHICLE_DETECT task referencing it.
         """
@@ -89,6 +90,9 @@ class VideoReader:
                 "video_path": self.video_path,
                 "video_filename": os.path.basename(self.video_path),
                 "video_ts_frame": frame_idx,
+                "fps": self.fps,
+                "video_fps": self.fps,
+                "video_ts_ms": ts_ms,
             },
         )
 
@@ -174,7 +178,9 @@ class VideoReader:
             if not ret:
                 break
 
-            self.enqueue_frame(frame_idx, frame)
+            # capture current timestamp in milliseconds if available
+            ts_ms = self.cap.get(cv2.CAP_PROP_POS_MSEC)
+            self.enqueue_frame(frame_idx, frame, ts_ms=ts_ms)
             frame_idx += 1
 
         self.cap.release()

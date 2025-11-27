@@ -28,6 +28,7 @@ from pipeline.categories import *
 # Dispatcher handlers
 from pipeline.dispatch_handlers import (
     handle_vehicle_detect_result,
+    handle_vehicle_track_result,
     handle_plate_detect_result,
     handle_ocr_result,
     handle_plate_smooth_result,
@@ -63,6 +64,7 @@ signal.signal(signal.SIGTERM, handle_sigint)
 
 handlers = {
     TaskCategory.VEHICLE_DETECT: handle_vehicle_detect_result,
+    TaskCategory.VEHICLE_TRACK:   handle_vehicle_track_result,
     TaskCategory.PLATE_DETECT:   handle_plate_detect_result,
     TaskCategory.OCR:            handle_ocr_result,
     TaskCategory.PLATE_SMOOTH:   handle_plate_smooth_result,

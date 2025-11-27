@@ -45,6 +45,8 @@ def _build_record(task, payload: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
         record.setdefault("frame_idx", task.frame_idx)
     if task.track_id is not None:
         record.setdefault("track_id", task.track_id)
+    if "global_id" not in record and "global_id" in task.meta:
+        record["global_id"] = task.meta["global_id"]
     if "video_ts_frame" not in record:
         if "video_ts_frame" in task.meta:
             record["video_ts_frame"] = task.meta["video_ts_frame"]

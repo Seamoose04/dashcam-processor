@@ -13,7 +13,10 @@ This pipeline no longer uses a local SQLite task DB. All task orchestration is i
 
 # 2. Postgres Schema (`dashcam_final`)
 
-Only one table is persisted today: `vehicles`.
+Currently persisted tables:
+- `vehicles` (license plate events; now also carries `global_id` when tracking is available)
+- `tracks` (one row per detector track; provides `global_id`)
+- `track_motion` (per-frame motion for each track)
 
 ## 2.1 `vehicles` Table
 
@@ -22,6 +25,7 @@ Only one table is persisted today: `vehicles`.
 ```
 CREATE TABLE vehicles (
     id SERIAL PRIMARY KEY,
+    global_id TEXT,                     -- "{video_id}:{track_id}" when tracking is available
     track_id INTEGER,
     video_id TEXT NOT NULL,
     frame_idx INTEGER NOT NULL,
@@ -45,6 +49,7 @@ CREATE TABLE vehicles (
 | Column               | Meaning                                                      |
 | -------------------- | ------------------------------------------------------------ |
 | **id**               | Unique row identifier                                        |
+| **global_id**        | Optional global track key (`{video_id}:{track_id}`)          |
 | **track_id**         | Optional stable vehicle track ID (from detector)             |
 | **video_id**         | Short identifier (basename without extension)                |
 | **frame_idx**        | Frame number where this plate was observed                   |
@@ -88,3 +93,53 @@ Potential additions:
 The current schema is intentionally lean; add new tables as new downstream consumers appear.
 
 ---
+
+# 3. Global ID / Tracking Tables
+
+To support CPU-side motion tracking and cross-table joins, we introduce a `global_id` per detector track (`{video_id}:{track_id}`).
+
+## 3.1 `tracks` Table (one row per track)
+
+```
+CREATE TABLE tracks (
+    id SERIAL PRIMARY KEY,
+    global_id TEXT UNIQUE NOT NULL,        -- "{video_id}:{track_id}"
+    video_id TEXT NOT NULL,
+    track_id INTEGER NOT NULL,
+    frame_idx INTEGER,                     -- optional convenience; first seen frame
+    first_frame_idx INTEGER NOT NULL,
+    video_ts_frame INTEGER,
+    video_ts_ms DOUBLE PRECISION,
+    video_path TEXT,
+    video_filename TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+Use this as the anchor for joins across other per-track properties.
+
+## 3.2 `track_motion` Table (per-frame kinematics)
+
+```
+CREATE TABLE track_motion (
+    id SERIAL PRIMARY KEY,
+    global_id TEXT NOT NULL REFERENCES tracks(global_id),
+    track_id INTEGER,
+    video_id TEXT NOT NULL,
+    frame_idx INTEGER NOT NULL,
+    video_ts_frame INTEGER,
+    video_ts_ms DOUBLE PRECISION,
+    bbox JSONB,
+    vx DOUBLE PRECISION,
+    vy DOUBLE PRECISION,
+    speed_px_s DOUBLE PRECISION,
+    heading_deg DOUBLE PRECISION,
+    age_frames INTEGER,
+    conf REAL,
+    video_path TEXT,
+    video_filename TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+Join `track_motion` with `vehicles` (license plates) via `global_id` to answer queries such as “frames where plate X was moving toward the camera.”

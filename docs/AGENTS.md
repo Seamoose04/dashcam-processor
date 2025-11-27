@@ -42,8 +42,8 @@ main.py (process)
 
 # 4) CPU Workers (`pipeline/workers/cpu_worker_mp.py`)
 
-* **Scope:** categories `PLATE_SMOOTH`, `SUMMARY`, `FINAL_WRITE`.
-* **Scheduling:** chooses busiest CPU category; loads lightweight resources on switch (smoother, writer, etc.).
+* **Scope:** categories `VEHICLE_TRACK`, `PLATE_SMOOTH`, `SUMMARY`, `FINAL_WRITE`.
+* **Scheduling:** chooses busiest CPU category; loads lightweight resources on switch (tracker, smoother, writer, etc.).
 * **Work loop:** pop task → run processor → call handler (e.g., enqueue FINAL_WRITE or write to Postgres) → release dependencies.
 * **Visibility:** same heartbeat contract as GPU workers via `worker_status`.
 * **Shutdown:** also ignores SIGINT/SIGTERM; exits when `terminate` is set.

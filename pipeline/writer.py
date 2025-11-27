@@ -75,11 +75,17 @@ class Writer:
         columns = list(record.keys())
         values = [self._coerce_value(record[c]) for c in columns]
 
-        query = sql.SQL("INSERT INTO {table} ({cols}) VALUES ({vals})").format(
+        base_insert = sql.SQL("INSERT INTO {table} ({cols}) VALUES ({vals})").format(
             table=sql.Identifier(table),
             cols=sql.SQL(", ").join(sql.Identifier(c) for c in columns),
             vals=sql.SQL(", ").join(sql.Placeholder() for _ in columns),
         )
+
+        # Tracks should be idempotent on global_id to avoid duplicate insert races across workers.
+        if table == "tracks" and "global_id" in columns:
+            query = sql.SQL("{base} ON CONFLICT (global_id) DO NOTHING").format(base=base_insert)
+        else:
+            query = base_insert
 
         self.cur.execute(query, values)
 
