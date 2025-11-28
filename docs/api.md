@@ -28,6 +28,13 @@ FastAPI service that exposes processed pipeline results (plates, tracks) and ser
   - Response headers include `X-Clip-Start-Frame`, `X-Clip-End-Frame`, `X-Clip-Fps`.
 - `GET /tracks/{global_id}/motion?limit=50`
   - Recent kinematics rows for a track (from `track_motion`).
+- `GET /search/global_ids?q=...&limit=25`
+  - Fuzzy search track `global_id`s (from `tracks` table).
+- `GET /global_ids/{global_id}/preview`
+  - Preview image for the latest vehicle row matching the `global_id`.
+- `GET /global_ids/{global_id}/clip?window=45&frame_idx=...`
+  - MP4 clip centered on the latest vehicle frame for the `global_id`.
+  - Optionally specify `frame_idx` to target a specific frame; falls back to the nearest available frame for that global_id if the exact frame is missing.
 
 ## Media lookup
 - Records should carry `video_path` and/or `video_filename`. The resolver tries, in order:
@@ -55,4 +62,12 @@ curl -OJ "http://localhost:8001/vehicles/123/clip?window=60"
 
 # Track motion history
 curl "http://localhost:8001/tracks/video123:4/motion?limit=20"
+
+# Global ID search
+curl "http://localhost:8001/search/global_ids?q=video123:4&limit=5"
+
+# Global ID preview/clip
+curl -OJ http://localhost:8001/global_ids/video123:4/preview
+curl -OJ "http://localhost:8001/global_ids/video123:4/clip?window=60"
+curl -I "http://localhost:8001/global_ids/video123:4/clip?frame_idx=669&window=90"  # headers include X-Clip-Selected-Frame
 ```

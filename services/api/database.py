@@ -170,4 +170,166 @@ class FinalDB:
 
         return [dict(r) for r in rows]
 
+    # ------------------------------------------------------------------
+    # Global ID helpers
+    # ------------------------------------------------------------------
+
+    def search_global_ids(
+        self,
+        query: Optional[str] = None,
+        *,
+        limit: int = 25,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        """
+        List tracks by global_id, optionally fuzzy matched.
+        """
+        params: Dict[str, Any] = {"limit": limit, "offset": offset}
+        filters = []
+        order_by = "ORDER BY created_at DESC"
+
+        if query:
+            params["q"] = query
+            params["pattern"] = f"%{query}%"
+            filters.append("(global_id ILIKE %(pattern)s OR similarity(global_id, %(q)s) > 0)")
+            order_by = "ORDER BY similarity(global_id, %(q)s) DESC NULLS LAST, created_at DESC"
+
+        where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
+
+        sql = f"""
+            SELECT
+                global_id,
+                video_id,
+                track_id,
+                first_frame_idx,
+                video_ts_frame,
+                video_path,
+                video_filename,
+                created_at
+            FROM tracks
+            {where_clause}
+            {order_by}
+            LIMIT %(limit)s
+            OFFSET %(offset)s;
+        """
+        with self.conn.cursor() as cur:
+            cur.execute(sql, params)
+            rows = cur.fetchall() or []
+        return [dict(r) for r in rows]
+
+    def get_latest_vehicle_for_global(self, global_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Fetch the most recent vehicle row for a given global_id.
+        """
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    id,
+                    global_id,
+                    track_id,
+                    video_id,
+                    frame_idx,
+                    video_ts_frame,
+                    video_path,
+                    video_filename,
+                    ts,
+                    final_plate,
+                    plate_confidence,
+                    car_bbox,
+                    plate_bbox
+                FROM vehicles
+                WHERE global_id = %(gid)s
+                ORDER BY ts DESC
+                LIMIT 1;
+                """,
+                {"gid": global_id},
+            )
+            row = cur.fetchone()
+        return self._serialize_vehicle(row) if row else None
+
+    def get_vehicle_for_global_frame(self, global_id: str, frame_idx: int) -> Optional[Dict[str, Any]]:
+        """
+        Fetch a vehicle row for a given global_id and frame_idx.
+        """
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    id,
+                    global_id,
+                    track_id,
+                    video_id,
+                    frame_idx,
+                    video_ts_frame,
+                    video_path,
+                    video_filename,
+                    ts,
+                    final_plate,
+                    plate_confidence,
+                    car_bbox,
+                    plate_bbox
+                FROM vehicles
+                WHERE global_id = %(gid)s AND frame_idx = %(frame)s
+                ORDER BY ts DESC
+                LIMIT 1;
+                """,
+                {"gid": global_id, "frame": frame_idx},
+            )
+            row = cur.fetchone()
+        return self._serialize_vehicle(row) if row else None
+
+    def get_vehicle_for_global_nearest_frame(self, global_id: str, frame_idx: int) -> Optional[Dict[str, Any]]:
+        """
+        Fetch the closest vehicle row to the requested frame_idx for a global_id.
+        """
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    id,
+                    global_id,
+                    track_id,
+                    video_id,
+                    frame_idx,
+                    video_ts_frame,
+                    video_path,
+                    video_filename,
+                    ts,
+                    final_plate,
+                    plate_confidence,
+                    car_bbox,
+                    plate_bbox
+                FROM vehicles
+                WHERE global_id = %(gid)s
+                ORDER BY abs(frame_idx - %(frame)s) ASC, frame_idx ASC
+                LIMIT 1;
+                """,
+                {"gid": global_id, "frame": frame_idx},
+            )
+            row = cur.fetchone()
+        return self._serialize_vehicle(row) if row else None
+
+    def get_fastest_frame_idx(self, global_id: str) -> Optional[int]:
+        """
+        Return the frame_idx with highest speed for a track.
+        """
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT frame_idx
+                FROM track_motion
+                WHERE global_id = %(gid)s
+                ORDER BY speed_px_s DESC NULLS LAST, frame_idx ASC
+                LIMIT 1;
+                """,
+                {"gid": global_id},
+            )
+            row = cur.fetchone()
+        if not row:
+            return None
+        if isinstance(row, dict):
+            return row.get("frame_idx")
+        return row[0] if row else None
+
 db = FinalDB()
