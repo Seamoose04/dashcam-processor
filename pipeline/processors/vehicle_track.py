@@ -83,6 +83,10 @@ def process_vehicle_track(task: Task, state: Dict[str, Any]) -> List[dict]:
             continue
 
         conf = float(det.get("conf", 0.0))
+        x1, y1, x2, y2 = bbox
+        width = float(abs(x2 - x1))
+        height = float(abs(y2 - y1))
+        area = width * height
         global_id = f"{video_id}:{track_id}"
 
         prev = tracks.get(track_id)
@@ -121,6 +125,13 @@ def process_vehicle_track(task: Task, state: Dict[str, Any]) -> List[dict]:
             speed = math.hypot(vx, vy)
             heading_deg = math.degrees(math.atan2(vy, vx)) if speed > 0 else 0.0
 
+        # Scale dynamics from bbox size
+        prev_area = prev.get("area") if prev else None
+        scale_ratio = (area / prev_area) if prev_area and prev_area > 0 else 1.0
+        scale_rate = 0.0
+        if prev_area is not None and dt_s is not None and dt_s > 0:
+            scale_rate = (area - prev_area) / dt_s
+
         tracks[track_id] = {
             "bbox": bbox,
             "center": curr_center,
@@ -135,6 +146,7 @@ def process_vehicle_track(task: Task, state: Dict[str, Any]) -> List[dict]:
             "age": (prev.get("age", 0) + 1) if prev else 1,
             "conf": conf,
             "global_id": global_id,
+            "area": area,
         }
 
         results.append(
@@ -146,6 +158,11 @@ def process_vehicle_track(task: Task, state: Dict[str, Any]) -> List[dict]:
                 "video_ts_frame": task.meta.get("video_ts_frame", frame_idx),
                 "video_ts_ms": ts_ms,
                 "bbox": bbox,
+                "bbox_w": width,
+                "bbox_h": height,
+                "bbox_area": area,
+                "scale_rate": scale_rate,    # area units per second
+                "scale_ratio": scale_ratio,  # relative to previous frame
                 "vx": vx,
                 "vy": vy,
                 "speed_px_s": speed,

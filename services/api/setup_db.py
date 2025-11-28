@@ -124,6 +124,11 @@ CREATE TABLE IF NOT EXISTS track_motion (
     heading_deg DOUBLE PRECISION,
     age_frames INTEGER,
     conf REAL,
+    bbox_w DOUBLE PRECISION,
+    bbox_h DOUBLE PRECISION,
+    bbox_area DOUBLE PRECISION,
+    scale_rate DOUBLE PRECISION,
+    scale_ratio DOUBLE PRECISION,
     video_path TEXT,
     video_filename TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
@@ -132,6 +137,12 @@ CREATE TABLE IF NOT EXISTS track_motion (
 cur.execute("CREATE INDEX IF NOT EXISTS track_motion_global_idx ON track_motion(global_id);")
 cur.execute("CREATE INDEX IF NOT EXISTS track_motion_video_idx ON track_motion(video_id);")
 cur.execute("CREATE INDEX IF NOT EXISTS track_motion_frame_idx ON track_motion(frame_idx);")
+# Ensure newer columns exist even if table already existed.
+cur.execute("ALTER TABLE track_motion ADD COLUMN IF NOT EXISTS bbox_w DOUBLE PRECISION;")
+cur.execute("ALTER TABLE track_motion ADD COLUMN IF NOT EXISTS bbox_h DOUBLE PRECISION;")
+cur.execute("ALTER TABLE track_motion ADD COLUMN IF NOT EXISTS bbox_area DOUBLE PRECISION;")
+cur.execute("ALTER TABLE track_motion ADD COLUMN IF NOT EXISTS scale_rate DOUBLE PRECISION;")
+cur.execute("ALTER TABLE track_motion ADD COLUMN IF NOT EXISTS scale_ratio DOUBLE PRECISION;")
 
 # -----------------------------------------------------------------------------
 # DONE
