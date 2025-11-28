@@ -12,7 +12,7 @@ def get_logger(name: str):
     if logger.handlers:
         return logger  # already created
 
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.ERROR)
 
     handler = RotatingFileHandler(
         os.path.join(LOG_DIR, f"{name}.log"),

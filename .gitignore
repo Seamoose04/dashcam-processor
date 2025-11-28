@@ -1,7 +1,7 @@
 logs/*
 frame_store/*
 inputs/*
-pipeline.db*
+tmp/*
 
 **/__pycache__/*
 venv/*

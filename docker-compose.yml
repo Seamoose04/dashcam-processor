@@ -25,6 +25,14 @@ services:
       POSTGRES_DB: dashcam_final
     ports:
       - "8001:8000"
+    volumes:
+      - "./inputs/processed:/app/videos"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 1m
+      timeout: 3s
+      retries: 2
+      start_period: 5s
 
 volumes:
   finaldb_data:

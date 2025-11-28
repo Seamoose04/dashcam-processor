@@ -48,6 +48,8 @@ MAX_CPU_BACKLOG=int(os.environ.get("MAX_CPU_BACKLOG", 16))
 QUEUE_SOFT_LIMIT=int(os.environ.get("QUEUE_SOFT_LIMIT", 64))
 QUEUE_HARD_LIMIT=int(os.environ.get("QUEUE_HARD_LIMIT", 128))
 
+INPUT_DIR = "inputs/new"
+
 _QUEUE_REF: CentralTaskQueue | None = None  # set once queue is created so SIGINT handler can log it
 
 def handle_sigint(signum, frame):
@@ -75,8 +77,6 @@ def main():
     # ===========================================================
     # INIT
     # ===========================================================
-
-    INPUT_DIR = "inputs"
 
     log.info(
         "[CONFIG] gpu_workers=%s cpu_workers=%s gpu_backlog_limit=%s cpu_backlog_limit=%s",
