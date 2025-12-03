@@ -1,6 +1,7 @@
 # Processors (mapping categories → functions)
 from pipeline.processors.yolo_vehicle import load_vehicle_model, process_vehicle
 from pipeline.processors.yolo_plate import load_plate_model, process_plate
+from pipeline.processors.plate_denoise import load_plate_denoiser, process_plate_denoise
 from pipeline.processors.ocr import load_ocr, process_ocr
 from pipeline.processors.vehicle_track import load_vehicle_tracker, process_vehicle_track
 from pipeline.processors.plate_smooth import load_plate_smoother, process_plate_smooth
@@ -17,6 +18,7 @@ gpu_categories = [
 
 cpu_categories = [
     TaskCategory.VEHICLE_TRACK,
+    TaskCategory.PLATE_DENOISE,
     TaskCategory.PLATE_SMOOTH,
     TaskCategory.SUMMARY,
     TaskCategory.FINAL_WRITE,
@@ -42,6 +44,7 @@ gpu_processors = {
 # -----------------------------------------------------------
 cpu_resource_loaders = {
     TaskCategory.VEHICLE_TRACK: load_vehicle_tracker,
+    TaskCategory.PLATE_DENOISE: load_plate_denoiser,
     TaskCategory.PLATE_SMOOTH: load_plate_smoother,
     TaskCategory.SUMMARY:      load_summary,
     TaskCategory.FINAL_WRITE:  load_final_writer,
@@ -49,6 +52,7 @@ cpu_resource_loaders = {
 
 cpu_processors = {
     TaskCategory.VEHICLE_TRACK: process_vehicle_track,
+    TaskCategory.PLATE_DENOISE: process_plate_denoise,
     TaskCategory.PLATE_SMOOTH: process_plate_smooth,
     TaskCategory.SUMMARY:      process_summary,
     TaskCategory.FINAL_WRITE:  process_final_writer,

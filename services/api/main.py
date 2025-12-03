@@ -9,6 +9,8 @@ app = FastAPI(
     version="0.2.0",
 )
 
+OVERLAY_CHOICES = {"car_bbox", "plate_bbox", "motion"}
+
 
 def _augment_links(record: dict) -> dict:
     """Attach convenience URLs for media assets."""
@@ -20,6 +22,23 @@ def _augment_links(record: dict) -> dict:
         record["preview_url"] = f"/vehicles/{rid}/preview"
         record["clip_url"] = f"/vehicles/{rid}/clip"
     return record
+
+
+def _normalize_overlays(include: list[str] | None) -> set[str]:
+    overlays = set()
+    for item in include or []:
+        if not item:
+            continue
+        parts = [p.strip() for p in item.split(",") if p.strip()]
+        for part in parts:
+            key = part.lower()
+            if key not in OVERLAY_CHOICES:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid overlay '{part}'. Allowed: {sorted(OVERLAY_CHOICES)}",
+                )
+            overlays.add(key)
+    return overlays
 
 
 @app.get("/")
@@ -90,10 +109,28 @@ def vehicle_preview(vehicle_id: int):
 def vehicle_clip(
     vehicle_id: int,
     window: int = Query(45, ge=5, le=240, description="Number of frames to include in the clip"),
+    include: list[str] = Query(
+        [],
+        description="Overlay layers to render (car_bbox, plate_bbox, motion). Defaults to none.",
+    ),
 ):
     record = db.get_vehicle(vehicle_id)
     if not record:
         raise HTTPException(status_code=404, detail="Vehicle not found")
+
+    overlays = _normalize_overlays(include)
+    selected_frame = record.get("frame_idx")
+    start_frame = max((selected_frame or 0) - window // 2, 0)
+    end_frame = (selected_frame or 0) + window // 2
+
+    motion_by_frame = None
+    if overlays.intersection({"car_bbox", "motion"}) and record.get("global_id"):
+        motion_by_frame = db.motion_window(
+            record["global_id"],
+            start_frame=start_frame,
+            end_frame=end_frame,
+            video_id=record.get("video_id"),
+        )
 
     try:
         video_path = resolve_video_path(
@@ -107,6 +144,10 @@ def vehicle_clip(
             car_bbox=record.get("car_bbox"),
             plate_bbox=record.get("plate_bbox"),
             window=window,
+            overlay_layers=overlays,
+            motion_by_frame=motion_by_frame,
+            start_frame=start_frame,
+            end_frame=end_frame,
         )
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -190,8 +231,13 @@ def global_clip(
     global_id: str,
     frame_idx: int | None = Query(None, ge=0, description="Optional frame to center the clip; defaults to latest vehicle frame"),
     window: int = Query(45, ge=5, le=240, description="Number of frames to include in the clip"),
+    include: list[str] = Query(
+        [],
+        description="Overlay layers to render (car_bbox, plate_bbox, motion). Defaults to none.",
+    ),
 ):
     selected_frame = frame_idx
+    overlays = _normalize_overlays(include)
 
     if frame_idx is not None:
         record = db.get_vehicle_for_global_frame(global_id, frame_idx)
@@ -204,6 +250,19 @@ def global_clip(
     else:
         record = _get_record_for_global(global_id)
         selected_frame = record.get("frame_idx")
+
+    start_frame = max((selected_frame or 0) - window // 2, 0)
+    end_frame = (selected_frame or 0) + window // 2
+
+    motion_by_frame = None
+    if overlays.intersection({"car_bbox", "motion"}) and record.get("global_id"):
+        motion_by_frame = db.motion_window(
+            record["global_id"],
+            start_frame=start_frame,
+            end_frame=end_frame,
+            video_id=record.get("video_id"),
+        )
+
     try:
         video_path = resolve_video_path(
             record.get("video_path"),
@@ -216,6 +275,10 @@ def global_clip(
             car_bbox=record.get("car_bbox"),
             plate_bbox=record.get("plate_bbox"),
             window=window,
+            overlay_layers=overlays,
+            motion_by_frame=motion_by_frame,
+            start_frame=start_frame,
+            end_frame=end_frame,
         )
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -226,6 +289,7 @@ def global_clip(
         "X-Clip-Start-Frame": str(meta.get("start_frame")),
         "X-Clip-End-Frame": str(meta.get("end_frame")),
         "X-Clip-Fps": str(meta.get("fps")) if meta.get("fps") else "",
+        "X-Clip-Selected-Frame": str(selected_frame) if selected_frame is not None else "",
     }
     return FileResponse(
         clip_path,

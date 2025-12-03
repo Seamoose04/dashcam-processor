@@ -81,6 +81,8 @@ def process_plate_smooth(task, resource):
         text = task.meta.get("text")
     if conf is None:
         conf = task.meta.get("conf")
+    if conf is None:
+        conf = 1.0  # default when OCR did not supply a confidence
 
     key = (vid, tid)
 

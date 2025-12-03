@@ -23,18 +23,20 @@ FastAPI service that exposes processed pipeline results (plates, tracks) and ser
   - Fetch a single vehicle row (plate, bboxes, video/frame metadata).
 - `GET /vehicles/{id}/preview`
   - JPEG frame with car/plate boxes overlaid. Caches under `SNIPPET_ROOT`.
-- `GET /vehicles/{id}/clip?window=45`
-  - MP4 clip centered on the detection frame with boxes. `window` is frame count (default 45).
-  - Response headers include `X-Clip-Start-Frame`, `X-Clip-End-Frame`, `X-Clip-Fps`.
+- `GET /vehicles/{id}/clip?window=45&include=car_bbox`
+  - MP4 clip centered on the detection frame. `window` is frame count (default 45).
+  - Optional overlays via `include=` (repeatable or comma-separated): `car_bbox`, `plate_bbox`, `motion`. Defaults to none.
+  - Response headers include `X-Clip-Start-Frame`, `X-Clip-End-Frame`, `X-Clip-Fps`, `X-Clip-Selected-Frame`.
 - `GET /tracks/{global_id}/motion?limit=50`
   - Recent kinematics rows for a track (from `track_motion`).
 - `GET /search/global_ids?q=...&limit=25`
   - Fuzzy search track `global_id`s (from `tracks` table).
 - `GET /global_ids/{global_id}/preview`
   - Preview image for the latest vehicle row matching the `global_id`.
-- `GET /global_ids/{global_id}/clip?window=45&frame_idx=...`
+- `GET /global_ids/{global_id}/clip?window=45&frame_idx=...&include=car_bbox`
   - MP4 clip centered on the latest vehicle frame for the `global_id`.
   - Optionally specify `frame_idx` to target a specific frame; falls back to the nearest available frame for that global_id if the exact frame is missing.
+  - Optional overlays via `include=` (repeatable or comma-separated): `car_bbox`, `plate_bbox`, `motion`. Defaults to none. Overlays are pulled per-frame when motion data is available.
 
 ## Media lookup
 - Records should carry `video_path` and/or `video_filename`. The resolver tries, in order:
@@ -59,6 +61,10 @@ curl -OJ http://localhost:8001/vehicles/123/preview
 
 # Clip around the detection
 curl -OJ "http://localhost:8001/vehicles/123/clip?window=60"
+# Clip with overlays (vehicle bbox + motion vectors per-frame)
+curl -OJ "http://localhost:8001/vehicles/123/clip?window=60&include=car_bbox&include=motion"
+# Or comma-separated in one param
+curl -OJ "http://localhost:8001/vehicles/123/clip?window=60&include=car_bbox,motion"
 
 # Track motion history
 curl "http://localhost:8001/tracks/video123:4/motion?limit=20"

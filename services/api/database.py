@@ -1,4 +1,5 @@
 import os
+import time
 from typing import Any, Dict, List, Optional
 
 import psycopg2
@@ -6,14 +7,39 @@ import psycopg2.extras
 
 class FinalDB:
     def __init__(self):
-        self.conn = psycopg2.connect(
-            host=os.getenv("POSTGRES_HOST", "finaldb"),
-            database=os.getenv("POSTGRES_DB", "dashcam_final"),
-            user=os.getenv("POSTGRES_USER", "dashcam"),
-            password=os.getenv("POSTGRES_PASSWORD", "dashpass"),
-            cursor_factory=psycopg2.extras.RealDictCursor,
-        )
-        self.conn.autocommit = True
+        host = os.getenv("POSTGRES_HOST", "finaldb")
+        port = int(os.getenv("POSTGRES_PORT", "5432"))
+        dbname = os.getenv("POSTGRES_DB", "dashcam_final")
+        user = os.getenv("POSTGRES_USER", "dashcam")
+        password = os.getenv("POSTGRES_PASSWORD", "dashpass")
+
+        # Retry a few times to avoid a race where Postgres is still booting.
+        attempts = 8
+        delay = 2
+        last_err = None
+        for attempt in range(1, attempts + 1):
+            try:
+                self.conn = psycopg2.connect(
+                    host=host,
+                    port=port,
+                    database=dbname,
+                    user=user,
+                    password=password,
+                    cursor_factory=psycopg2.extras.RealDictCursor,
+                )
+                self.conn.autocommit = True
+                print(f"[DB] Connected to {host}:{port}/{dbname} as {user}")
+                break
+            except psycopg2.OperationalError as exc:
+                last_err = exc
+                if attempt == attempts:
+                    raise
+                wait = delay * attempt
+                print(
+                    f"[DB] Connection attempt {attempt}/{attempts} failed ({exc}). "
+                    f"Retrying in {wait}s..."
+                )
+                time.sleep(wait)
 
     def test(self):
         with self.conn.cursor() as cur:
@@ -169,6 +195,62 @@ class FinalDB:
             rows = cur.fetchall() or []
 
         return [dict(r) for r in rows]
+
+    def motion_window(
+        self,
+        global_id: str,
+        *,
+        start_frame: int,
+        end_frame: int,
+        video_id: Optional[str] = None,
+    ) -> Dict[int, Dict[str, Any]]:
+        """
+        Fetch per-frame motion rows for a global_id in the given frame window.
+        Returns a mapping of frame_idx -> row for fast lookup during rendering.
+        """
+        params: Dict[str, Any] = {"gid": global_id, "start": start_frame, "end": end_frame}
+        filters = ["global_id = %(gid)s", "frame_idx BETWEEN %(start)s AND %(end)s"]
+        if video_id:
+            filters.append("video_id = %(vid)s")
+            params["vid"] = video_id
+
+        where_clause = f"WHERE {' AND '.join(filters)}"
+
+        with self.conn.cursor() as cur:
+            cur.execute(
+                f"""
+                SELECT
+                    frame_idx,
+                    bbox,
+                    vx,
+                    vy,
+                    speed_px_s,
+                    heading_deg
+                FROM track_motion
+                {where_clause}
+                ORDER BY frame_idx ASC;
+                """,
+                params,
+            )
+            rows = cur.fetchall() or []
+
+        motion_map: Dict[int, Dict[str, Any]] = {}
+
+        def _normalize_bbox(bbox: Any):
+            if bbox is None:
+                return None
+            if isinstance(bbox, (list, tuple)):
+                return [float(v) for v in bbox]
+            return bbox
+
+        for row in rows:
+            entry = dict(row)
+            entry["bbox"] = _normalize_bbox(entry.get("bbox"))
+            frame_idx = entry.get("frame_idx")
+            if frame_idx is not None:
+                motion_map[int(frame_idx)] = entry
+
+        return motion_map
 
     # ------------------------------------------------------------------
     # Global ID helpers

@@ -158,9 +158,9 @@ def handle_plate_detect_result(
     best = max(result_obj, key=lambda d: d["conf"])
     plate_bbox = best["bbox"]
 
-    # Build OCR task
+    # Build plate denoise task (CPU) before OCR
     new_task = Task(
-        category=TaskCategory.OCR,
+        category=TaskCategory.PLATE_DENOISE,
         payload={
             "plate_bbox": plate_bbox,
             "car_bbox": car_bbox,
@@ -185,7 +185,7 @@ def handle_plate_detect_result(
     push_with_backpressure(queue, -1, new_task)
 
     log.info(
-        "[Dispatcher] PLATE_DETECT → OCR plate_bbox=%s video=%s frame=%s",
+        "[Dispatcher] PLATE_DETECT → PLATE_DENOISE plate_bbox=%s video=%s frame=%s",
         plate_bbox,
         video_id,
         frame_idx,
@@ -195,7 +195,65 @@ def handle_plate_detect_result(
 
 
 # ------------------------------------------------------------------------
-# 2b. VEHICLE_TRACK → FINAL_WRITE (tracks + motion)
+# 2b. PLATE_DENOISE → OCR
+# ------------------------------------------------------------------------
+
+def handle_plate_denoise_result(
+    task: Task,
+    result_obj: dict,
+    queue: CentralTaskQueue,
+) -> None:
+    """
+    CPU denoise result: forwards cleaned plate crop into OCR.
+    """
+
+    payload_ref = task.meta.get("payload_ref")
+    video_id = task.video_id
+    frame_idx = task.frame_idx
+    car_bbox = task.meta.get("car_bbox")
+    plate_bbox = task.meta.get("plate_bbox")
+    dependencies = task.meta.get("dependencies") or ([payload_ref] if payload_ref else [])
+
+    plate_roi = result_obj.get("plate_roi")
+
+    new_task = Task(
+        category=TaskCategory.OCR,
+        payload={
+            "plate_bbox": plate_bbox,
+            "car_bbox": car_bbox,
+            "plate_roi": plate_roi,
+        },
+        priority=0,
+        video_id=video_id,
+        frame_idx=frame_idx,
+        track_id=task.track_id,
+        meta=_merge_meta(
+            task,
+            {
+                "payload_ref": payload_ref,
+                "car_bbox": car_bbox,
+                "plate_bbox": plate_bbox,
+                "dependencies": dependencies,
+                "global_id": task.meta.get("global_id"),
+            },
+        ),
+    )
+
+    frame_store.add_refs(dependencies)
+    push_with_backpressure(queue, -1, new_task)
+
+    log.info(
+        "[Dispatcher] PLATE_DENOISE → OCR plate_bbox=%s video=%s frame=%s (roi=%s)",
+        plate_bbox,
+        video_id,
+        frame_idx,
+        "yes" if plate_roi is not None else "no",
+    )
+    # Release happens when this task completes (worker handles it).
+
+
+# ------------------------------------------------------------------------
+# 2c. VEHICLE_TRACK → FINAL_WRITE (tracks + motion)
 # ------------------------------------------------------------------------
 
 def handle_vehicle_track_result(

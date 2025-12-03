@@ -64,7 +64,11 @@ def _coerce_bbox(bbox: Any) -> Optional[Tuple[int, int, int, int]]:
     return tuple(nums)  # type: ignore[return-value]
 
 
-def _draw_boxes(frame, car_bbox: Optional[Tuple[int, int, int, int]], plate_bbox: Optional[Tuple[int, int, int, int]]):
+def _draw_boxes(
+    frame,
+    car_bbox: Optional[Tuple[int, int, int, int]],
+    plate_bbox: Optional[Tuple[int, int, int, int]],
+):
     """
     Overlay car + plate bounding boxes on a frame.
     """
@@ -74,6 +78,44 @@ def _draw_boxes(frame, car_bbox: Optional[Tuple[int, int, int, int]], plate_bbox
     if plate_bbox:
         x1, y1, x2, y2 = plate_bbox
         cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 165, 255), 2)
+    return frame
+
+
+def _draw_motion_vector(
+    frame,
+    motion: Optional[Dict[str, Any]],
+    bbox: Optional[Tuple[int, int, int, int]],
+    fps: float,
+):
+    """
+    Overlay a motion vector arrow for the frame. Uses bbox center when available.
+    """
+    if not motion:
+        return frame
+    vx = motion.get("vx")
+    vy = motion.get("vy")
+    if vx is None or vy is None:
+        return frame
+
+    h, w = frame.shape[:2]
+    if bbox:
+        x1, y1, x2, y2 = bbox
+        start = (int(round((x1 + x2) * 0.5)), int(round((y1 + y2) * 0.5)))
+    else:
+        start = (w // 2, h // 2)
+
+    # Convert px/s to px/frame for visualization; clamp to avoid zero-length arrows.
+    step = max(fps, 1e-3)
+    dx = int(round(float(vx) / step))
+    dy = int(round(float(vy) / step))
+    if dx == 0 and dy == 0:
+        if abs(float(vx)) >= abs(float(vy)):
+            dx = 1 if float(vx) >= 0 else -1
+        else:
+            dy = 1 if float(vy) >= 0 else -1
+    end = (start[0] + dx, start[1] + dy)
+
+    cv2.arrowedLine(frame, start, end, (255, 0, 0), 2, tipLength=0.25)
     return frame
 
 
@@ -117,17 +159,26 @@ def render_clip(
     car_bbox: Any = None,
     plate_bbox: Any = None,
     window: int = 45,
+    overlay_layers: Optional[set[str]] = None,
+    motion_by_frame: Optional[Dict[int, Dict[str, Any]]] = None,
+    start_frame: Optional[int] = None,
+    end_frame: Optional[int] = None,
 ) -> Tuple[Path, Dict[str, Any]]:
     """
-    Render a short MP4 clip around the target frame with bounding boxes overlaid.
+    Render a short MP4 clip around the target frame with optional overlays.
     """
     stem = video_path.stem
-    out_path = SNIPPET_ROOT / f"{stem}_{center_frame}_w{window}.mp4"
-    start_frame = max(center_frame - window // 2, 0)
+    overlays = overlay_layers or set()
+    overlay_tag = "-".join(sorted(overlays)) if overlays else "none"
+    out_path = SNIPPET_ROOT / f"{stem}_{center_frame}_w{window}_ovl-{overlay_tag}.mp4"
+
+    # Boundaries for motion lookup and clip positioning.
+    clip_start = start_frame if start_frame is not None else max(center_frame - window // 2, 0)
+    clip_end = end_frame if end_frame is not None else center_frame + window // 2
     if out_path.exists() and out_path.stat().st_size > 0:
         return out_path, {
-            "start_frame": start_frame,
-            "end_frame": start_frame + window - 1,
+            "start_frame": clip_start,
+            "end_frame": clip_end,
         }
 
     cap = cv2.VideoCapture(str(video_path))
@@ -135,22 +186,38 @@ def render_clip(
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
 
-    end_frame = center_frame + window // 2
-
-    cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+    cap.set(cv2.CAP_PROP_POS_FRAMES, clip_start)
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     writer = cv2.VideoWriter(str(out_path), fourcc, fps, (width, height))
 
-    car = _coerce_bbox(car_bbox)
-    plate = _coerce_bbox(plate_bbox)
+    use_car = "car_bbox" in overlays
+    use_plate = "plate_bbox" in overlays
+    use_motion = "motion" in overlays
+
+    car_static = _coerce_bbox(car_bbox) if use_car else None
+    plate_static = _coerce_bbox(plate_bbox) if use_plate else None
 
     written = 0
-    frame_idx = start_frame
-    while frame_idx <= end_frame:
+    frame_idx = clip_start
+    while frame_idx <= clip_end:
         ok, frame = cap.read()
         if not ok or frame is None:
             break
-        frame = _draw_boxes(frame, car, plate)
+
+        motion = motion_by_frame.get(frame_idx) if motion_by_frame else None
+        car_box = car_static
+        plate_box = plate_static
+
+        if use_car and motion and motion.get("bbox") is not None:
+            car_box = _coerce_bbox(motion.get("bbox")) or car_static
+        if use_plate and motion and motion.get("plate_bbox") is not None:
+            plate_box = _coerce_bbox(motion.get("plate_bbox"))
+
+        if use_car or use_plate:
+            frame = _draw_boxes(frame, car_box if use_car else None, plate_box if use_plate else None)
+        if use_motion:
+            frame = _draw_motion_vector(frame, motion, car_box, fps)
+
         writer.write(frame)
         written += 1
         frame_idx += 1
@@ -162,8 +229,8 @@ def render_clip(
         raise RuntimeError(f"Failed to render clip to {out_path}")
 
     meta = {
-        "start_frame": start_frame,
-        "end_frame": start_frame + written - 1,
+        "start_frame": clip_start,
+        "end_frame": clip_start + written - 1,
         "fps": fps,
     }
     return out_path, meta
