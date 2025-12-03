@@ -1,2 +1,0 @@
-- [ ] move postgres writing into a separate task/processor file (design a writer processor and create a task from handle_smooth_result instead of writing inline)
-- [ ] create a separate tracking stage (replace YOLO track_id with our own tracker for more accurate IDs)

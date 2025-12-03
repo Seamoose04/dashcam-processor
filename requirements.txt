@@ -1,5 +1,0 @@
-numpy
-ultralytics
-easyocr
-psycopg2
-python-dotenv

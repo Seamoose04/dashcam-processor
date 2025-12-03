@@ -1,7 +1,4 @@
-logs/*
-frame_store/*
 inputs/*
-tmp/*
 
 **/__pycache__/*
 venv/*
