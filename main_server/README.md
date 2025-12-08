@@ -12,6 +12,18 @@ pip install -r requirements.txt
 uvicorn src.app:app --reload --port 8080
 ```
 
+## Run with Docker
+
+From `main_server/`:
+
+```bash
+docker compose -f docker/docker-compose.yml up --build
+```
+
+- Default DB: persisted SQLite at `/data/dev.db` in a named volume (`main_server_data`).
+- Override DB: set `MAIN_SERVER_DATABASE_URL` in your shell or an `.env` file (`sqlite:////data/dev.db` is the default).
+- Entrypoint runs Alembic migrations on startup, then launches `uvicorn` on `0.0.0.0:8080`.
+
 ### Database migrations (Alembic)
 - Config lives in `alembic.ini` with scripts under `alembic/`.
 - Local DB URL defaults to `sqlite:///./dev.db` (override with `MAIN_SERVER_DATABASE_URL`).
