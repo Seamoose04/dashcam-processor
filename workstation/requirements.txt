@@ -1,0 +1,5 @@
+# Core workstation dependencies. Install CUDA-enabled torch separately for best GPU performance.
+numpy
+opencv-python
+ultralytics
+easyocr
