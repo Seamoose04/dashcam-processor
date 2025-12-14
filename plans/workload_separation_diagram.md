@@ -17,7 +17,11 @@ graph TD
     style E fill:#ff9,stroke:#333
     style F fill:#f99,stroke:#333
 
-    linkStyle 0,1,linkStyle 1,1,linkStyle 2,1,linkStyle 3,1,linkStyle 4,1
+    linkStyle 0 stroke:#333,stroke-width:2px;
+    linkStyle 1 stroke:#333,stroke-width:2px;
+    linkStyle 2 stroke:#333,stroke-width:2px;
+    linkStyle 3 stroke:#333,stroke-width:2px;
+    linkStyle 4 stroke:#333,stroke-width:2px;
 ```
 
 ## Detailed Workload Breakdown
@@ -26,7 +30,7 @@ graph TD
 
 ```mermaid
 graph TD
-    subgraph Jetson+Coral["Jetson + Coral (Preprocessor)"]
+    subgraph jetson[Jetson + Coral]
         A[Pull PREPROCESS_VIDEO task] --> B[Read Raw Video from NAS]
         B --> C[Extract Low-Res Frames]
         C --> D[Motion Filtering]
@@ -37,7 +41,7 @@ graph TD
         H --> I[Mark PREPROCESS complete]
     end
 
-    style Jetson+Coral fill:#9f9,stroke:#333
+    style jetson fill:#9f9,stroke:#333
 ```
 
 **Jetson Workload Details:**
@@ -52,7 +56,7 @@ graph TD
 
 ```mermaid
 graph TD
-    subgraph FourOhNinety["4090 Machine (Heavy Processor)"]
+    subgraph fourOhNinety[4090 Machine]
         A[Pull HEAVY_PROCESS task] --> B[Read Raw Video + Jetson Outputs from NAS]
         B --> C[Full-Res YOLO Detection]
         C --> D[Plate Crop Extraction]
@@ -65,7 +69,7 @@ graph TD
         J --> K[Mark HEAVY_PROCESS complete]
     end
 
-    style FourOhNinety fill:#99f,stroke:#333
+    style fourOhNinety fill:#99f,stroke:#333
 ```
 
 **4090 Workload Details:**
@@ -108,7 +112,9 @@ graph TB
     style D fill:#99f,stroke:#333
     style E fill:#ff9,stroke:#333
 
-    linkStyle 0,2,linkStyle 1,2,linkStyle 2,2
+    linkStyle 0 stroke:#333,stroke-width:2px;
+    linkStyle 1 stroke:#333,stroke-width:2px;
+    linkStyle 2 stroke:#333,stroke-width:2px;
 ```
 
 **Key Data Flow Points:**
@@ -124,7 +130,8 @@ graph TB
 ### Jetson + Coral
 
 ```mermaid
-pie showData title Jetson+Coral Resource Usage
+pie showData
+    title Jetson + Coral Resource Usage
     "Coral TPU" : 80
     "CPU" : 40
     "GPU" : 20
@@ -134,7 +141,8 @@ pie showData title Jetson+Coral Resource Usage
 ### 4090 Machine
 
 ```mermaid
-pie showData title 4090 Resource Usage
+pie showData
+    title 4090 Resource Usage
     "GPU" : 90
     "VRAM" : 85
     "CPU" : 45
@@ -193,7 +201,9 @@ graph LR
     style D fill:#99f,stroke:#333,color:white
     style E fill:#ff9,stroke:#333
 
-    linkStyle 0,1,linkStyle 1,2,linkStyle 2,2
+    linkStyle 0 stroke:#333,stroke-width:2px;
+    linkStyle 1 stroke:#333,stroke-width:2px;
+    linkStyle 2 stroke:#333,stroke-width:2px;
 
     B -->|"Reduces workload by 80-95%"| C
     D -->|"Processes only meaningful data"| E
