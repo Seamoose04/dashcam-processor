@@ -1,0 +1,23 @@
+{
+  "global": {
+    "task_retry_delay_seconds": 300,
+    "max_concurrent_tasks_per_device": 1,
+    "storage_retention_days": {
+      "raw_videos": 90,
+      "preproc_data": 30,
+      "heavy_output": 7
+    }
+  },
+  "devices": {},
+  "storage_paths": {
+    "indoor_nas": {
+      "base": "//nas-1/videos/",
+      "raw": "raw/",
+      "preproc": "preproc/",
+      "heavy_output": "heavy_output/"
+    },
+    "shed_nas": {
+      "archive_base": "//shed-nas/archive/"
+    }
+  }
+}

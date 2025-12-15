@@ -1,0 +1,14 @@
+{
+  "hostname": "jetson-coral-1",
+  "task_types": ["PREPROCESS_VIDEO"],
+  "capabilities": {
+    "coral_tpu_available": true,
+    "max_memory_gb": 4,
+    "scratch_space_gb": 32
+  },
+  "processing": {
+    "frame_extraction_resolution": "640x480",
+    "motion_threshold": 0.15,
+    "min_plate_confidence": 0.6
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "hostname": "rtx-4090-1",
+  "task_types": ["HEAVY_PROCESS_VIDEO"],
+  "capabilities": {
+    "cuda_cores": 16384,
+    "vram_gb": 24,
+    "scratch_space_gb": 500
+  },
+  "processing": {
+    "yolo_model_path": "/models/yolov8n.pt",
+    "ocr_model_path": "/models/plate.pt",
+    "max_frames_per_batch": 16,
+    "gps_alignment_tolerance_ms": 200
+  }
+}

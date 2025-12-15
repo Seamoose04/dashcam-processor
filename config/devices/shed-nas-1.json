@@ -1,0 +1,12 @@
+{
+  "hostname": "shed-nas-1",
+  "task_types": ["ARCHIVE_VIDEO"],
+  "capabilities": {
+    "read_throughput_mb_s": 100,
+    "write_throughput_mb_s": 50,
+    "available_space_tb": 24
+  },
+  "storage_paths": {
+    "archive_base": "/archive/"
+  }
+}

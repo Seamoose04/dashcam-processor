@@ -1,0 +1,13 @@
+{
+  "hostname": "indoor-nas-1",
+  "task_types": ["INGEST_VIDEO"],
+  "capabilities": {
+    "read_throughput_mb_s": 100,
+    "write_throughput_mb_s": 50,
+    "available_space_tb": 8
+  },
+  "storage_paths": {
+    "raw_videos": "/videos/raw/",
+    "preproc_data": "/videos/preproc/"
+  }
+}
