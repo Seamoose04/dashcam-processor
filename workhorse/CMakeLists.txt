@@ -10,7 +10,7 @@ file(GLOB_RECURSE WORKHORSE_SOURCES CONFIGURE_DEPENDS
 )
 
 # Workhorse library
-add_library(Workhorse STATIC ${WORKHORSE_SOURCES})
+add_executable(Workhorse ${WORKHORSE_SOURCES})
 
 # Include
 target_include_directories(Workhorse PUBLIC
