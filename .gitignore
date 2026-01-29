@@ -1,4 +1,5 @@
 inputs/*
 
-**/.env*
-!**/.env.example
+build/
+.vscode/
+.cache/
