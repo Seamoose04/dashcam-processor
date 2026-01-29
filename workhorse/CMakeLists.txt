@@ -4,14 +4,15 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Sources
-file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS
+file(GLOB_RECURSE WORKHORSE_SOURCES CONFIGURE_DEPENDS
 	src/*.cpp
 	src/*.h
 )
 
-# Add the 'include' directory recursively to the include paths for the target
-target_include_directories(Workhorse PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/"
-)
+# Workhorse library
+add_library(Workhorse STATIC ${WORKHORSE_SOURCES})
 
-add_executable(Workhorse ${SOURCE_FILES})
+# Include
+target_include_directories(Workhorse PUBLIC
+	${CMAKE_CURRENT_SOURCE_DIR}/src
+)
