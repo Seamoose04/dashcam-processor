@@ -1,7 +1,4 @@
 inputs/*
 
-**/__pycache__/*
-venv/*
-
 **/.env*
 !**/.env.example
