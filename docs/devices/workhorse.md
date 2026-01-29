@@ -1,13 +1,13 @@
-# 4090 Machine
+# workhorse Machine
 
-The Windows PC with the RTX 4090 GPU is the **heavy-processing engine** of the entire pipeline. It performs all computationally expensive tasks, including full-resolution object detection, OCR, and GPS alignment, while also managing final per-video decisions such as plate selection and metadata consolidation.
+The Windows PC with the RTX workhorse GPU is the **heavy-processing engine** of the entire pipeline. It performs all computationally expensive tasks, including full-resolution object detection, OCR, and GPS alignment, while also managing final per-video decisions such as plate selection and metadata consolidation.
 
-The 4090 behaves as an autonomous worker device that pulls tasks, performs deterministic local work, and publishes downstream tasks only upon successful completion.
+The workhorse behaves as an autonomous worker device that pulls tasks, performs deterministic local work, and publishes downstream tasks only upon successful completion.
 
 ---
 # 1. Responsibilities
 
-The 4090 machine is responsible for:
+The workhorse machine is responsible for:
 
 * Pulling heavy-processing tasks from the main server
 * Reading raw video files directly from Indoor NAS (previously handled by Jetson)
@@ -19,12 +19,12 @@ The 4090 machine is responsible for:
 * Storing temporary files locally during execution
 * Publishing remote archival/finalization tasks upon completion
 
-The 4090 is optimized for **occasional bursts of heavy compute**, e.g. running overnight.
+The workhorse is optimized for **occasional bursts of heavy compute**, e.g. running overnight.
 
 ---
 # 2. How Tasks Are Pulled
 
-The 4090 pulls tasks of type:
+The workhorse pulls tasks of type:
 
 ```
 HEAVY_PROCESS_VIDEO
@@ -35,7 +35,7 @@ Tasks specify:
 * Paths to raw video on the Indoor NAS (previously handled by Jetson)
 * Parameters for extraction rate, resolution, filtering thresholds
 
-Upon pulling, the 4090 becomes the sole executor of that heavy-processing task.
+Upon pulling, the workhorse becomes the sole executor of that heavy-processing task.
 
 ---
 # 3. Heavy Processing Steps
@@ -95,7 +95,7 @@ All outputs are small and highly structured.
 # 4. Storage Behavior
 During task execution:
 
-* All heavy intermediates (frames, crops, temp metadata) are kept **locally** on 4090’s fast SSD
+* All heavy intermediates (frames, crops, temp metadata) are kept **locally** on workhorse’s fast SSD
 * Nothing is written to NAS until the task fully completes
 * Raw video is streamed directly from the Indoor NAS
 
@@ -109,7 +109,7 @@ On interruption:
 
 * Local scratch is cleared automatically at startup
 * The task remains `pending` on the server
-* 4090 simply pulls the same task again and recomputes
+* workhorse simply pulls the same task again and recomputes
 
 This ensures fully deterministic recovery.
 
@@ -117,7 +117,7 @@ This ensures fully deterministic recovery.
 # 5. Remote Task Creation
 Once heavy processing is complete:
 
-* The 4090 publishes a **remote archival task** (usually handled by the server or Shed NAS)
+* The workhorse publishes a **remote archival task** (usually handled by the server or Shed NAS)
 * Then marks the heavy-processing task as `complete`
 
 Remote task creation always happens **after** completion, preventing duplicates.
@@ -140,7 +140,7 @@ Remote task creation always happens **after** completion, preventing duplicates.
 
 ---
 # 7. Scheduling & Usage Pattern
-The 4090 typically:
+The workhorse typically:
 * Remains idle during the day (or available for normal use)
 * Runs heavy-processing tasks **overnight**
 * Pulls tasks only when the system is not being actively used (optional throttling)
@@ -148,27 +148,27 @@ The 4090 typically:
 Future improvements may include:
 * Power-based scheduling
 * CPU/GPU-usage thresholds
-* Automatic pausing if the 4090 becomes busy
+* Automatic pausing if the workhorse becomes busy
 
 ---
 # 8. Failure & Recovery Behavior
 Because all work is deterministic:
 
-### If the 4090 crashes mid-task:
+### If the workhorse crashes mid-task:
 * Local scratch is discarded at reboot
 * Task remains `pending` on server
-* 4090 pulls the task again
+* workhorse pulls the task again
 * Fully recomputes
 
 ### If network storage is unavailable:
-* 4090 simply waits and retries
+* workhorse simply waits and retries
 
 ### If user interrupts to play games:
 * Local work stops instantly
 * Device resumes processing later when allowed
 
-This level of fault-tolerance allows the 4090 to work opportunistically.
+This level of fault-tolerance allows the workhorse to work opportunistically.
 
 ---
 # 9. Summary
-The 4090 machine is the **core computational powerhouse** of the pipeline. It performs full-resolution detection, OCR, GPS alignment, and metadata consolidation, all while minimizing its footprint through temporary local storage and strict task-system semantics.
+The workhorse machine is the **core computational powerhouse** of the pipeline. It performs full-resolution detection, OCR, GPS alignment, and metadata consolidation, all while minimizing its footprint through temporary local storage and strict task-system semantics.
