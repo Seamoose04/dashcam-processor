@@ -3,7 +3,7 @@
 
 int main() {
     TaskTestCPU task;
-    task.Prepare();
+    task.Start();
     task.Run();
     task.Stop();
     return EXIT_SUCCESS;

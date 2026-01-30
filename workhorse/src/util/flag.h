@@ -1,15 +1,30 @@
 #pragma once
 
-template<typename T>
+#include <type_traits>
+
+template<typename Enum>
 class Flag {
+    static_assert(std::is_enum_v<Enum>, "Flag requires an enum type.");
 public:
     Flag() = default;
 
-    void Set(T flag) {
-        _states |= 2 ^ static_cast<unsigned int>(flag);
+    void Add(Enum flag) {
+        _states |= 1 << static_cast<unsigned int>(flag);
+    }
+    void Clear(Enum flag) {
+        _states &= !(1 << static_cast<unsigned int>(flag));
+    }
+    void Toggle(Enum flag) {
+        _states ^= 1 << static_cast<unsigned int>(flag);
+    }
+    void Set(Enum flag, bool state) {
+        Clear(flag);
+        _states |= 1 << static_cast<unsigned int>(flag);
+    }
+    bool Get(Enum flag) {
+        return _states & (1 << static_cast<unsigned int>(flag));
     }
 
 private:
-    T _flags;
-    unsigned long _states;
+    unsigned long long _states;
 };

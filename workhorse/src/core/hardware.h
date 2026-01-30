@@ -2,15 +2,15 @@
 
 #include <unordered_set>
 
-class Resource {
+class Hardware {
 public:
     enum Type {
         CPU,
         GPU,
     };
 
-    Resource(Type type);
-    bool operator==(const Resource& other) const;
+    Hardware(Type type);
+    bool operator==(const Hardware& other) const;
     int getType() const;
     
 private:
@@ -19,8 +19,8 @@ private:
 
 namespace std {
     template <>
-    struct hash<Resource> {
-        std::size_t operator()(const Resource& other) const noexcept {
+    struct hash<Hardware> {
+        std::size_t operator()(const Hardware& other) const noexcept {
             return std::hash<int>{}(other.getType());
         }
     };

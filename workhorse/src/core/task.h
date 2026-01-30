@@ -3,16 +3,25 @@
 #include <unordered_set>
 #include <functional>
 
-#include "core/resource.h"
+#include "core/hardware.h"
+#include "util/flag.h"
 
 class Task {
 public:
+    enum class Flags : unsigned int {
+        Quit
+    };
+
     Task() = default;
-    virtual void Prepare() = 0;
+    void Start();
     virtual void Run() = 0;
-    virtual void Finish() = 0;
-    virtual void Stop(bool immediate=false) = 0;
+    void Finish();
+    void Stop();
     
 protected:
-    std::unordered_set<Resource> _resources_required;
+    virtual void _Start() = 0;
+    virtual void _Finish() = 0;
+
+    std::unordered_set<Hardware> _hardware_required;
+    Flag<Flags> _flags;
 };

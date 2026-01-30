@@ -5,8 +5,10 @@
 class TaskTestCPU : public Task {
 public:
     TaskTestCPU() = default;
-    void Prepare() override;
     void Run() override;
-    void Finish() override;
-    void Stop(bool immediate=false) override;
+private:
+    void _Start() override;
+    void _Finish() override;
+
+    std::unordered_set<Hardware> _hardware_required = { Hardware::CPU };
 };
