@@ -4,13 +4,15 @@
 
 class Hardware {
 public:
-    enum Type {
-        CPU,
+    enum class Type {
+        CPU = 0,
         GPU,
+        MAX_COUNT
     };
 
     Hardware(Type type);
     bool operator==(const Hardware& other) const;
+    
     int getType() const;
     
 private:

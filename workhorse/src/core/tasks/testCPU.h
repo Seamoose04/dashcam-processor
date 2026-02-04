@@ -10,5 +10,5 @@ private:
     void _Start() override;
     void _Finish() override;
 
-    std::unordered_set<Hardware> _hardware_required = { Hardware::CPU };
+    std::unordered_set<Hardware> _hardware_required = { Hardware::Type::CPU };
 };

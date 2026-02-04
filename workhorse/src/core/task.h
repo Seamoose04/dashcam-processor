@@ -13,11 +13,13 @@ public:
     };
 
     Task() = default;
+    bool operator==(const Task& other) const;
+
     void Start();
     virtual void Run() = 0;
     void Finish();
     void Stop();
-    
+
 protected:
     virtual void _Start() = 0;
     virtual void _Finish() = 0;

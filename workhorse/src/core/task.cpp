@@ -1,5 +1,9 @@
 #include "task.h"
 
+bool Task::operator==(const Task& other) const {
+    return this == &other;
+}
+
 void Task::Start() {
     _Start();
 }
