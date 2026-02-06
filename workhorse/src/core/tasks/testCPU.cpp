@@ -2,6 +2,8 @@
 
 #include <iostream>
 
+TaskTestCPU::TaskTestCPU() : Task(_type) { }
+
 void TaskTestCPU::_Start() {
     std::cout << "starting" << std::endl;
 }

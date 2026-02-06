@@ -5,12 +5,13 @@
 #include <mutex>
 #include <condition_variable>
 #include <memory>
+#include <functional>
 
-#include <core/task.h>
-#include <core/hardware.h>
+#include "core/task.h"
+#include "core/hardware.h"
 
 struct HardwareQueue {
-    std::queue<std::unique_ptr<Task>> tasks;
+    std::queue<std::unique_ptr<Task>> tasks = {};
     std::mutex mutex;
     std::condition_variable are_tasks_available;
 };
@@ -19,8 +20,13 @@ class TaskQueue {
 public:
     TaskQueue();
     void AddTask(Hardware type, std::unique_ptr<Task> task);
-    std::shared_ptr<Task> GetNextTask(Hardware type);
+    std::shared_ptr<Task> GetNextTask(Hardware type, std::function<bool()> stop_condition);
     void TaskFinished(std::shared_ptr<Task> task);
+
+    void NotifyAll();
+
+    unsigned int GetInProgressTasks();
+    unsigned int GetUnclaimedTasks();
 
 private:
     std::unordered_map<Hardware, HardwareQueue> _unclaimed_tasks;

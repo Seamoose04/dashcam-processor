@@ -4,7 +4,7 @@
 
 class TaskTestCPU : public Task {
 public:
-    TaskTestCPU() = default;
+    TaskTestCPU();
     void Run() override;
 private:
     void _Start() override;

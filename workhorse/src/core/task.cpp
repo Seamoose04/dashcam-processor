@@ -1,5 +1,7 @@
 #include "task.h"
 
+Task::Task(Hardware type) : _type(type) { }
+
 bool Task::operator==(const Task& other) const {
     return this == &other;
 }

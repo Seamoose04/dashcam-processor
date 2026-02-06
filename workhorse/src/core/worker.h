@@ -10,6 +10,7 @@
 class Worker {
 public:
     enum class Flags {
+        Idle,
         Stop,
         Quit
     };
@@ -18,6 +19,8 @@ public:
     void Work(std::shared_ptr<TaskQueue> queue);
     void Stop();
     void Quit();
+
+    bool GetIsIdle();
 
 private:
     Hardware _type;

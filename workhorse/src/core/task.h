@@ -12,7 +12,7 @@ public:
         Quit
     };
 
-    Task() = default;
+    Task(Hardware type);
     bool operator==(const Task& other) const;
 
     void Start();
