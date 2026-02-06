@@ -26,5 +26,5 @@ public:
     }
 
 private:
-    unsigned long long _states;
+    unsigned long long _states = 0;
 };

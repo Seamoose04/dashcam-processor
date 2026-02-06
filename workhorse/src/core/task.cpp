@@ -8,7 +8,7 @@ void Task::Start() {
     _Start();
 }
 
-void Task::Stop() {
+void Task::Quit() {
     _flags.Add(Task::Flags::Quit);
 }
 

@@ -19,11 +19,11 @@ class TaskQueue {
 public:
     TaskQueue();
     void AddTask(Hardware type, std::unique_ptr<Task> task);
-    Task* GetNextTask(Hardware type);
-    void TaskFinished(Task* task);
+    std::shared_ptr<Task> GetNextTask(Hardware type);
+    void TaskFinished(std::shared_ptr<Task> task);
 
 private:
     std::unordered_map<Hardware, HardwareQueue> _unclaimed_tasks;
-    std::unordered_map<Task*, std::unique_ptr<Task>> _unfinished_tasks;
+    std::unordered_set<std::shared_ptr<Task>> _unfinished_tasks;
     std::mutex _unfinished_tasks_mutex;
 };

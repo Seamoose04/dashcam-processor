@@ -13,7 +13,7 @@ void TaskQueue::AddTask(Hardware type, std::unique_ptr<Task> task) {
     unclaimed_hardware_tasks.are_tasks_available.notify_one();
 }
 
-Task* TaskQueue::GetNextTask(Hardware type) {
+std::shared_ptr<Task> TaskQueue::GetNextTask(Hardware type) {
     HardwareQueue& unclaimed_hardware_tasks = _unclaimed_tasks[type];
     std::unique_lock<std::mutex> unclaimed_tasks_lock(unclaimed_hardware_tasks.mutex);
 
@@ -28,15 +28,14 @@ Task* TaskQueue::GetNextTask(Hardware type) {
     Task* task_ptr = task.get();
 
     std::unique_lock<std::mutex> unfinished_tasks_lock(_unfinished_tasks_mutex);
-    _unfinished_tasks[task_ptr] = std::move(task);
+    _unfinished_tasks.insert(std::move(task));
     unfinished_tasks_lock.unlock();
 
-    return task.get();
+    return std::move(task);
 }
 
-void TaskQueue::TaskFinished(Task* task) {
+void TaskQueue::TaskFinished(std::shared_ptr<Task> task) {
     std::unique_lock<std::mutex> unfinished_tasks_lock(_unfinished_tasks_mutex);
-    std::unique_ptr<Task> finished_task = std::move(_unfinished_tasks[task]);
     _unfinished_tasks.erase(task);
     unfinished_tasks_lock.unlock();
 }

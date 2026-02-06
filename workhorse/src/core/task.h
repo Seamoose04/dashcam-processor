@@ -18,12 +18,12 @@ public:
     void Start();
     virtual void Run() = 0;
     void Finish();
-    void Stop();
+    void Quit();
 
 protected:
     virtual void _Start() = 0;
     virtual void _Finish() = 0;
 
-    std::unordered_set<Hardware> _hardware_required;
+    Hardware _type;
     Flag<Flags> _flags;
 };
