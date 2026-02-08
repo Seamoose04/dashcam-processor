@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 
+
 class Logger {
 public:
     enum class Level {
@@ -13,7 +14,12 @@ public:
         Info
     };
 
-    Logger(std::filesystem::path log_path, Level level);
+	struct Config {
+		std::filesystem::path path;
+		Level level;
+	};
+
+    Logger(Config conf);
     ~Logger();
 
     void Log(Level level, std::string msg);

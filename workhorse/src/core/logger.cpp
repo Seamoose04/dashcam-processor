@@ -1,8 +1,8 @@
 #include "logger.h"
 
-Logger::Logger(std::filesystem::path log_path, Level level) {
-    _level = level;
-    _log_path = log_path;
+Logger::Logger(Config conf) {
+    _level = conf.level;
+    _log_path = conf.path;
     _out_file = std::ofstream(_log_path, std::ios_base::app);
 }
 
