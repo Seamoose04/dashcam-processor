@@ -1,4 +1,5 @@
 inputs/*
+logs/*
 
 build/
 .vscode/

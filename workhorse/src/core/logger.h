@@ -4,7 +4,6 @@
 #include <filesystem>
 #include <fstream>
 
-
 class Logger {
 public:
     enum class Level {

@@ -1,26 +1,27 @@
 #include "testCPU.h"
 
 #include <iostream>
+#include <format>
 
 TaskTestCPU::TaskTestCPU() : Task(_type) { }
 
-void TaskTestCPU::_Start() {
-    std::cout << "starting" << std::endl;
+void TaskTestCPU::_Start(Logger& logger) {
+    logger.Log(Logger::Level::Info, "TaskTestCPU::Info Starting...\n");
 }
 
-void TaskTestCPU::Run() {
+void TaskTestCPU::Run(Logger& logger) {
     for (int i = 0; i <= 100000; i++) {
         if (_flags.Get(Flags::Quit)) {
-            std::cout << "Stopped early" << std::endl;
+            logger.Log(Logger::Level::Warn, "TaskTestCPU::Warn Stopped early\n");
             return;
         }
         if (i % 10000 == 0) {
-            std::cout << "Running. Progress: " << i / 10000 << "/10" << std::endl;
+            logger.Log(Logger::Level::Info, std::format("TaskTestCPU::Info Progress: {}/10\n", i / 10000));
         }
     }
-    Finish();
+    Finish(logger);
 }
 
-void TaskTestCPU::_Finish() {
-    std::cout << "finished" << std::endl;
+void TaskTestCPU::_Finish(Logger& logger) {
+    logger.Log(Logger::Level::Info, "TaskTestCPU::Info Complete\n");
 }

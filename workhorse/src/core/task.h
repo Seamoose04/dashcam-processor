@@ -4,6 +4,7 @@
 #include <functional>
 
 #include "core/hardware.h"
+#include "core/logger.h"
 #include "util/flag.h"
 
 class Task {
@@ -15,14 +16,14 @@ public:
     Task(Hardware type);
     bool operator==(const Task& other) const;
 
-    void Start();
-    virtual void Run() = 0;
-    void Finish();
+    void Start(Logger& logger);
+    virtual void Run(Logger& logger) = 0;
+    void Finish(Logger& logger);
     void Quit();
 
 protected:
-    virtual void _Start() = 0;
-    virtual void _Finish() = 0;
+    virtual void _Start(Logger& logger) = 0;
+    virtual void _Finish(Logger& logger) = 0;
 
     Hardware _type;
     Flag<Flags> _flags;

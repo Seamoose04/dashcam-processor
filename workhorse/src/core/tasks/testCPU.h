@@ -5,10 +5,10 @@
 class TaskTestCPU : public Task {
 public:
     TaskTestCPU();
-    void Run() override;
+    void Run(Logger& logger) override;
 private:
-    void _Start() override;
-    void _Finish() override;
+    void _Start(Logger& logger) override;
+    void _Finish(Logger& logger) override;
 
     Hardware _type = Hardware::Type::CPU;
 };
