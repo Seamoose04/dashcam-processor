@@ -1,6 +1,7 @@
 #pragma once
 
 #include <type_traits>
+#include <atomic>
 
 template<typename Enum>
 class Flag {
@@ -9,22 +10,25 @@ public:
     Flag() = default;
 
     void Add(Enum flag) {
-        _states |= 1 << static_cast<unsigned int>(flag);
+        _states.fetch_or(1ULL << static_cast<unsigned int>(flag), std::memory_order_release);
     }
     void Clear(Enum flag) {
-        _states &= !(1 << static_cast<unsigned int>(flag));
+        _states.fetch_and(~(1ULL << static_cast<unsigned int>(flag)), std::memory_order_release);
     }
     void Toggle(Enum flag) {
-        _states ^= 1 << static_cast<unsigned int>(flag);
+        _states.fetch_xor(1ULL << static_cast<unsigned int>(flag), std::memory_order_release);
     }
     void Set(Enum flag, bool state) {
-        Clear(flag);
-        _states |= 1 << static_cast<unsigned int>(flag);
+        if (state) {
+            Add(flag);
+        } else {
+            Clear(flag);
+        }
     }
     bool Get(Enum flag) {
-        return _states & (1 << static_cast<unsigned int>(flag));
+        return _states.load(std::memory_order_acquire) & (1ULL << static_cast<unsigned int>(flag));
     }
 
 private:
-    unsigned long long _states = 0;
+    std::atomic<unsigned long long> _states{0};
 };

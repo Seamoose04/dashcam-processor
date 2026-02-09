@@ -3,6 +3,10 @@
 #include <string>
 #include <filesystem>
 #include <fstream>
+#include <thread>
+#include <mutex>
+
+#include "util/flag.h"
 
 class Logger {
 public:
@@ -11,6 +15,10 @@ public:
         Error,
         Warn,
         Info
+    };
+
+    enum class Flags {
+        Stop
     };
 
 	struct Config {
@@ -22,10 +30,16 @@ public:
     ~Logger();
 
     void Log(Level level, std::string msg);
-    std::filesystem::path GetLogPath();
+    std::filesystem::path GetFIFOPath();
 
 private:
+    void _ReadFIFO();
+
+    Level _level;
     std::filesystem::path _log_path;
     std::ofstream _out_file;
-    Level _level;
+    std::filesystem::path _fifo_path;
+    std::thread _fifo_reader_thread;
+    std::mutex _logging_mutex;
+    Flag<Flags> _flags;
 };

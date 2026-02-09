@@ -11,10 +11,6 @@ void Task::Run(Logger& logger) {
     Finish(logger);
 }
 
-void Task::Quit() {
-    _flags.Add(Task::Flags::Quit);
-}
-
 void Task::Finish(Logger& logger) {
     _Finish(logger);
 }

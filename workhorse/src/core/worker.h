@@ -14,13 +14,11 @@ public:
     enum class Flags {
         Idle,
         Stop,
-        Quit
     };
 
     Worker(Hardware type, Logger::Config logger_conf);
     void Work(std::shared_ptr<TaskQueue> queue);
     void Stop();
-    void Quit();
 
     bool GetIsIdle();
 

@@ -27,11 +27,6 @@ void Worker::Stop() {
     _flags.Add(Flags::Stop);
 }
 
-void Worker::Quit() {
-    _flags.Add(Flags::Quit);
-    _current_task->Quit();
-}
-
 bool Worker::GetIsIdle() {
     return _flags.Get(Flags::Idle);
 }

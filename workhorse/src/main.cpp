@@ -13,7 +13,7 @@
 #include "core/tasks/testDarknet.h"
 
 #define MAX_CPU_WORKERS 4
-#define MAX_GPU_WORKERS 1
+#define MAX_GPU_WORKERS 4
 #define LOG_LEVEL Logger::Level::Info
 
 int main() {
@@ -65,11 +65,12 @@ int main() {
 
     if (img.data) {
         tasks->AddTask(std::make_unique<TaskTestDarknet>(img));
+        tasks->AddTask(std::make_unique<TaskTestDarknet>(img));
+        tasks->AddTask(std::make_unique<TaskTestDarknet>(img));
+        tasks->AddTask(std::make_unique<TaskTestDarknet>(img));
     } else {
         logger.Log(Logger::Level::Error, "Main::Error Image could not be loaded");
     }
-
-    
 
     while (tasks->GetInProgressTasks() + tasks->GetUnclaimedTasks() > 0) {
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));

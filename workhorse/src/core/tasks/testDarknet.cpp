@@ -9,7 +9,7 @@ TaskTestDarknet::TaskTestDarknet(cv::Mat img_to_process) : Task(Hardware::Type::
 
 void TaskTestDarknet::_Run(Logger& logger) {
     logger.Log(Logger::Level::Info, "TaskTestDarknet::Info Loading Darknet...\n");
-    Darknet::set_output_stream(logger.GetLogPath());
+    Darknet::set_output_stream(logger.GetFIFOPath());
     DarkHelp::Config cfg;
     cfg.cfg_filename = "models/yolov7/yolov7.cfg";
     cfg.weights_filename = "models/yolov7/yolov7.weights";
