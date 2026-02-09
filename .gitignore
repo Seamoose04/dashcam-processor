@@ -2,8 +2,6 @@ inputs/*
 outputs/*
 logs/*
 
-models/**
-
 build/
 .vscode/
 .cache/
