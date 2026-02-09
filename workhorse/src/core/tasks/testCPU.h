@@ -6,6 +6,6 @@ class TaskTestCPU : public Task {
 public:
     TaskTestCPU();
 private:
-    void _Run(Logger& logger) override;
-    void _Finish(Logger& logger) override;
+    void _Run() override;
+    void _Finish() override;
 };

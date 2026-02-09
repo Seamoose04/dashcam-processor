@@ -1,7 +1,7 @@
 #include "worker.h"
 
 Worker::Worker(Hardware type, Logger::Config logger_conf)
-    : _type(type), _logger(logger_conf) {}
+    : _type(type), _logger(std::make_unique<Logger>(logger_conf)) {}
 
 void Worker::Work(std::shared_ptr<TaskQueue> queue) {
     _queue = std::move(queue);
@@ -18,7 +18,12 @@ void Worker::Work(std::shared_ptr<TaskQueue> queue) {
             break;
         }
         _flags.Clear(Flags::Idle);
-        _current_task->Run(_logger);
+        _current_task->Run(
+            _logger.get(),
+            [this] (std::unique_ptr<Task> task) {
+                _queue->AddTask(std::move(task));
+            }
+        );
         _queue->TaskFinished(_current_task);
     }
 }

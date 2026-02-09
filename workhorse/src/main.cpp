@@ -9,8 +9,8 @@
 #include "core/logger.h"
 #include "core/hardware.h"
 #include "core/taskQueue.h"
-#include "core/tasks/testCPU.h"
-#include "core/tasks/testDarknet.h"
+// #include "core/tasks/testCPU.h"
+#include "core/tasks/detectCars.h"
 
 #define MAX_CPU_WORKERS 4
 #define MAX_GPU_WORKERS 4
@@ -57,21 +57,20 @@ int main() {
         gpu_worker_threads.emplace_back(&Worker::Work, &(*worker), tasks);
     }
     
+    // Spawn Tasks
     // for (unsigned int i = 0; i < 128; i++) {
     //     tasks->AddTask(std::make_unique<TaskTestCPU>());
     // }
 
-    cv::Mat img = cv::imread("inputs/raw/test.jpeg");
+    cv::Mat img = cv::imread("inputs/road.jpg");
 
     if (img.data) {
-        tasks->AddTask(std::make_unique<TaskTestDarknet>(img));
-        tasks->AddTask(std::make_unique<TaskTestDarknet>(img));
-        tasks->AddTask(std::make_unique<TaskTestDarknet>(img));
-        tasks->AddTask(std::make_unique<TaskTestDarknet>(img));
+        tasks->AddTask(std::make_unique<TaskDetectCars>(img));
     } else {
         logger.Log(Logger::Level::Error, "Main::Error Image could not be loaded");
     }
 
+    // Start processing
     while (tasks->GetInProgressTasks() + tasks->GetUnclaimedTasks() > 0) {
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }

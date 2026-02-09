@@ -27,5 +27,5 @@ private:
     Flag<Flags> _flags;
     std::shared_ptr<TaskQueue> _queue;
     std::shared_ptr<Task> _current_task;
-	Logger _logger;
+	std::unique_ptr<Logger> _logger;
 };

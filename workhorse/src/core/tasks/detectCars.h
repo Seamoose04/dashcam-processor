@@ -4,9 +4,9 @@
 
 #include "core/task.h"
 
-class TaskTestDarknet : public Task {
+class TaskDetectCars : public Task {
 public:
-    TaskTestDarknet(cv::Mat img_to_process);
+    TaskDetectCars(cv::Mat img_to_process);
 
 private:
     void _Run() override;
