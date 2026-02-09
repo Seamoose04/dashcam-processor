@@ -12,6 +12,10 @@ void Logger::Log(Level level, std::string msg) {
     }
 }
 
+std::filesystem::path Logger::GetLogPath() {
+    return _log_path;
+}
+
 Logger::~Logger() {
     if (_out_file.is_open()) {
         _out_file.close();

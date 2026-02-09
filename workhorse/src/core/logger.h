@@ -22,6 +22,7 @@ public:
     ~Logger();
 
     void Log(Level level, std::string msg);
+    std::filesystem::path GetLogPath();
 
 private:
     std::filesystem::path _log_path;

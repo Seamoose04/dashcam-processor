@@ -6,8 +6,9 @@ bool Task::operator==(const Task& other) const {
     return this == &other;
 }
 
-void Task::Start(Logger& logger) {
-    _Start(logger);
+void Task::Run(Logger& logger) {
+    _Run(logger);
+    Finish(logger);
 }
 
 void Task::Quit() {
@@ -16,4 +17,8 @@ void Task::Quit() {
 
 void Task::Finish(Logger& logger) {
     _Finish(logger);
+}
+
+Hardware Task::GetType() {
+    return _type;
 }

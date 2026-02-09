@@ -1,5 +1,8 @@
 inputs/*
+outputs/*
 logs/*
+
+models/**
 
 build/
 .vscode/

@@ -9,12 +9,15 @@ void Worker::Work(std::shared_ptr<TaskQueue> queue) {
     while (!_flags.Get(Flags::Stop)) {
         _flags.Add(Flags::Idle);
         _current_task = _queue->GetNextTask(
-            _type, [this]() -> bool { return _flags.Get(Flags::Stop); });
+            _type, 
+            [this]() -> bool {
+                return _flags.Get(Flags::Stop);
+            }
+        );
         if (_current_task == nullptr) {
             break;
         }
         _flags.Clear(Flags::Idle);
-        _current_task->Start(_logger);
         _current_task->Run(_logger);
         _queue->TaskFinished(_current_task);
     }

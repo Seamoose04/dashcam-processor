@@ -3,6 +3,18 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+if(NOT UNIX)
+    message(FATAL_ERROR "This project can only be built on a Unix-like system (Linux, macOS, etc.). Windows is not supported.")
+endif()
+
+# Packages
+find_package(Threads REQUIRED)
+find_package(OpenCV	REQUIRED)
+find_library(DARKHELP darkhelp)
+find_library(DARKNET darknet)
+
+include_directories(${OpenCV_INCLUDE_DIRS})
+
 # Sources
 file(GLOB_RECURSE WORKHORSE_SOURCES CONFIGURE_DEPENDS
 	src/*.cpp
@@ -16,3 +28,6 @@ add_executable(Workhorse ${WORKHORSE_SOURCES})
 target_include_directories(Workhorse PUBLIC
 	${CMAKE_CURRENT_SOURCE_DIR}/src
 )
+
+# Libraries
+target_link_libraries(Workhorse Threads::Threads ${DARKHELP} ${DARKNET} ${OpenCV_LIBS})

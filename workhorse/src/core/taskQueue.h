@@ -19,7 +19,7 @@ struct HardwareQueue {
 class TaskQueue {
 public:
     TaskQueue();
-    void AddTask(Hardware type, std::unique_ptr<Task> task);
+    void AddTask(std::unique_ptr<Task> task);
     std::shared_ptr<Task> GetNextTask(Hardware type, std::function<bool()> stop_condition);
     void TaskFinished(std::shared_ptr<Task> task);
 
