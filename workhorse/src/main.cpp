@@ -22,6 +22,8 @@ int main() {
     logger_conf.path = "logs/main.txt";
     Logger logger(logger_conf);
 
+    logger.Log(Logger::Level::Info, "Main::Info Initializing...\n");
+
     std::vector<std::unique_ptr<Worker>> cpu_workers;
     cpu_workers.reserve(MAX_CPU_WORKERS);
 
@@ -34,13 +36,15 @@ int main() {
         conf.path = std::format("logs/cpu_workers/worker{}.txt", i);
         cpu_workers.push_back(std::make_unique<Worker>(Hardware::Type::CPU, conf));
     }
-
+    
     for (int i = 0; i < MAX_GPU_WORKERS; i++) {
         Logger::Config conf;
         conf.level = LOG_LEVEL;
         conf.path = std::format("logs/gpu_workers/worker{}.txt", i);
         gpu_workers.push_back(std::make_unique<Worker>(Hardware::Type::GPU, conf));
     }
+
+    logger.Log(Logger::Level::Info, std::format("Main::Info Spawned {} cpu workers and {} gpu workers\n", cpu_workers.size(), gpu_workers.size()));
 
     std::shared_ptr<TaskQueue> tasks = std::make_shared<TaskQueue>();
 
@@ -56,6 +60,8 @@ int main() {
     for (auto& worker : gpu_workers) {
         gpu_worker_threads.emplace_back(&Worker::Work, &(*worker), tasks);
     }
+
+    logger.Log(Logger::Level::Info, "Main::Info worker threads started.\n");
     
     // Spawn Tasks
     // for (unsigned int i = 0; i < 128; i++) {
@@ -70,10 +76,14 @@ int main() {
         logger.Log(Logger::Level::Error, "Main::Error Image could not be loaded");
     }
 
+    logger.Log(Logger::Level::Info, "Main::Info Starting.\n");
+
     // Start processing
     while (tasks->GetInProgressTasks() + tasks->GetUnclaimedTasks() > 0) {
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
+    
+    logger.Log(Logger::Level::Info, "Main::Info Stopping...\n");
 
     for (auto& worker : cpu_workers) {
         worker->Stop();
@@ -84,6 +94,8 @@ int main() {
     }
 
     tasks->NotifyAll();
+
+    logger.Log(Logger::Level::Info, "Main::Info Workers stopped.\n");
 
     for (auto& worker_thread : cpu_worker_threads) {
         if (worker_thread.joinable()) {
@@ -96,6 +108,8 @@ int main() {
             worker_thread.join();
         }
     }
+
+    logger.Log(Logger::Level::Info, "Main::Info Stopped.\n");
 
     return EXIT_SUCCESS;
 }
