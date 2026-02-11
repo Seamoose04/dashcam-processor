@@ -1,6 +1,6 @@
 #include "saveImg.h"
 
-TaskSaveImg::TaskSaveImg(cv::Mat img, std::filesystem::path path) : Task(Hardware::Type::CPU) {
+TaskSaveImg::TaskSaveImg(cv::Mat img, std::filesystem::path path) {
     _img = img;
     _path = path;
 }

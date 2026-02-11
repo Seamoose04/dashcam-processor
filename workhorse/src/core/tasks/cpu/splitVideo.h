@@ -3,10 +3,10 @@
 #include <filesystem>
 #include <opencv2/opencv.hpp>
 
-#include "core/task.h"
+#include "core/tasks/cpu.h"
 #include "util/flag.h"
 
-class TaskSplitVideo : public Task {
+class TaskSplitVideo : public TaskCPU {
 public:
     enum class Flags {
         Stop,

@@ -1,13 +1,15 @@
 #include "hardware.h"
 
-Hardware::Hardware(Type type) {
-    _type = type;
-}
+#include "core/task.h"
 
 bool Hardware::operator==(const Hardware& other) const {
-    return getType() == other.getType();
+    return GetTypeName() == other.GetTypeName();
 }
 
-int Hardware::getType() const {
-    return static_cast<int>(_type);
+std::string Hardware::GetTypeName() const {
+    return _type_name;
+}
+
+void Hardware::SetTypeName(std::string name) {
+    _type_name = name;
 }

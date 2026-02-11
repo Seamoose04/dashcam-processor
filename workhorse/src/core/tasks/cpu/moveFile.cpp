@@ -2,7 +2,7 @@
 
 #include <format>
 
-TaskMoveFile::TaskMoveFile(std::filesystem::path source, std::filesystem::path destination, bool remove_src) : Task(Hardware::Type::CPU) {
+TaskMoveFile::TaskMoveFile(std::filesystem::path source, std::filesystem::path destination, bool remove_src) {
     _src_path = source;
     _dest_path = destination;
     _rm_src = false;

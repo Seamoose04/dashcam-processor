@@ -8,7 +8,6 @@
 #include <functional>
 
 #include "core/task.h"
-#include "core/hardware.h"
 
 struct HardwareQueue {
     std::queue<std::unique_ptr<Task>> tasks = {};
@@ -20,16 +19,16 @@ class TaskQueue {
 public:
     TaskQueue();
     void AddTask(std::unique_ptr<Task> task);
-    std::shared_ptr<Task> GetNextTask(Hardware type, std::function<bool()> stop_condition);
+    std::shared_ptr<Task> GetNextTask(std::string type, std::function<bool()> stop_condition);
     void TaskFinished(std::shared_ptr<Task> task);
-
+    
     void NotifyAll();
-
+    
+    std::unordered_map<std::string, unsigned int> GetTaskCounts();
     unsigned int GetInProgressTasks();
-    unsigned int GetUnclaimedTasks();
-
+    
 private:
-    std::unordered_map<Hardware, HardwareQueue> _unclaimed_tasks;
+    std::unordered_map<std::string, HardwareQueue> _unclaimed_tasks;
     std::unordered_set<std::shared_ptr<Task>> _unfinished_tasks;
     std::mutex _unfinished_tasks_mutex;
 };

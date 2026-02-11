@@ -1,28 +1,20 @@
 #include "detectCars.h"
 
-#include <darknet.hpp>
-#include <format>
+#include "core/tasks/cpu/saveImg.h"
 
-#include "core/tasks/saveImg.h"
-
-TaskDetectCars::TaskDetectCars(std::shared_ptr<cv::Mat> img_to_process, std::string video_id) : Task(Hardware::Type::GPU) {
+TaskDetectCars::TaskDetectCars(std::shared_ptr<cv::Mat> img_to_process, std::string video_id) {
     _img = img_to_process;
     _video_id = video_id;
 }
 
 void TaskDetectCars::_Run() {
-    _logger->Log(Logger::Level::Info, "TaskDetectCars::Info Loading yolov7...\n");
-    Darknet::set_output_stream(_logger->GetFIFOPath());
-    DarkHelp::Config cfg;
-    cfg.cfg_filename = "models/yolov7/yolov7.cfg";
-    cfg.weights_filename = "models/yolov7/yolov7.weights";
-    cfg.names_filename = "models/yolov7/coco.names";
-    cfg.threshold = 0.3;
-    cfg.include_all_names = false;
-    DarkHelp::NN nn(cfg);
+    _logger->Log(Logger::Level::Info, "TaskDetectCars::Info Setting config...\n");
+
+    _nn->config.threshold = 0.3;
+    _nn->config.include_all_names = false;
 
     _logger->Log(Logger::Level::Info, "TaskDetectCars::Info Processing Image...\n");
-    const auto result = nn.predict(*_img);
+    const auto result = _nn->predict(*_img);
 
     int car_id = 0;
     for (const auto& prediction : result) {

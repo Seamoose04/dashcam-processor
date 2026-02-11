@@ -2,9 +2,9 @@
 
 #include <filesystem>
 
-#include "core/task.h"
+#include "core/tasks/cpu.h"
 
-class TaskMoveFile : public Task {
+class TaskMoveFile : public TaskCPU {
 public:
     TaskMoveFile(std::filesystem::path source, std::filesystem::path destination, bool remove_src = false);
 

@@ -1,6 +1,8 @@
 #include "task.h"
 
-Task::Task(Hardware type) : _type(type) { }
+#include "core/hardware.h"
+
+Task::Task(std::string type) : _type(type) { }
 
 bool Task::operator==(const Task& other) const {
     return this == &other;
@@ -18,6 +20,6 @@ void Task::Finish() {
     _logger = nullptr;
 }
 
-Hardware Task::GetType() {
+std::string Task::GetType() {
     return _type;
 }

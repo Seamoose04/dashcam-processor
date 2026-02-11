@@ -7,9 +7,10 @@
 
 #include "core/worker.h"
 #include "core/logger.h"
-#include "core/hardware.h"
+#include "core/hardware/cpu.h"
+#include "core/hardware/yoloV7.h"
 #include "core/taskQueue.h"
-#include "core/tasks/splitVideo.h"
+#include "core/tasks/cpu/splitVideo.h"
 
 #define MAX_CPU_WORKERS 4
 #define MAX_GPU_WORKERS 4
@@ -33,14 +34,20 @@ int main() {
         Logger::Config conf;
         conf.level = LOG_LEVEL;
         conf.path = std::format("logs/cpu_workers/worker{}.txt", i);
-        cpu_workers.push_back(std::make_unique<Worker>(Hardware::Type::CPU, conf));
+
+        std::vector<std::shared_ptr<Hardware>> hardware;
+        hardware.push_back(Registry<Hardware>::Instance().Create("CPU"));
+        cpu_workers.push_back(std::make_unique<Worker>(std::move(hardware), conf));
     }
     
     for (int i = 0; i < MAX_GPU_WORKERS; i++) {
         Logger::Config conf;
         conf.level = LOG_LEVEL;
         conf.path = std::format("logs/gpu_workers/worker{}.txt", i);
-        gpu_workers.push_back(std::make_unique<Worker>(Hardware::Type::GPU, conf));
+
+        std::vector<std::shared_ptr<Hardware>> hardware;
+        hardware.push_back(Registry<Hardware>::Instance().Create("YoloV7"));
+        gpu_workers.push_back(std::make_unique<Worker>(std::move(hardware), conf));
     }
 
     logger.Log(Logger::Level::Info, std::format("Main::Info Spawned {} cpu workers and {} gpu workers\n", cpu_workers.size(), gpu_workers.size()));
@@ -52,12 +59,12 @@ int main() {
 
     cpu_worker_threads.reserve(cpu_workers.size());
     for (auto& worker : cpu_workers) {
-        cpu_worker_threads.emplace_back(&Worker::Work, &(*worker), tasks);
+        cpu_worker_threads.emplace_back(&Worker::Work, worker.get(), tasks);
     }
 
     gpu_worker_threads.reserve(gpu_workers.size());
     for (auto& worker : gpu_workers) {
-        gpu_worker_threads.emplace_back(&Worker::Work, &(*worker), tasks);
+        gpu_worker_threads.emplace_back(&Worker::Work, worker.get(), tasks);
     }
 
     logger.Log(Logger::Level::Info, "Main::Info worker threads started.\n");
@@ -67,8 +74,22 @@ int main() {
     tasks->AddTask(std::make_unique<TaskSplitVideo>(std::make_shared<cv::VideoCapture>(video)));
 
     // Start processing
-    while (tasks->GetInProgressTasks() + tasks->GetUnclaimedTasks() > 0) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    for (;;) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+        if (tasks->GetInProgressTasks() == 0) {
+            std::unordered_map<std::string, unsigned int> counts = tasks->GetTaskCounts();
+            unsigned int total = 0;
+            for (auto count : counts) {
+                if (count.second > 0) {
+                    total += count.second;
+                    break;
+                }
+            }
+            if (total == 0) {
+                break;
+            }
+        }
     }
     
     logger.Log(Logger::Level::Info, "Main::Info Stopping...\n");

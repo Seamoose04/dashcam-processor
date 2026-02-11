@@ -2,7 +2,7 @@
 
 #include <format>
 
-TaskTestCPU::TaskTestCPU() : Task(Hardware::Type::CPU) { }
+TaskTestCPU::TaskTestCPU() { }
 
 void TaskTestCPU::_Run() {
     _logger->Log(Logger::Level:: Info, "TaskTestCPU::Info Starting...\n");

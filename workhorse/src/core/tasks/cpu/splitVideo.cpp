@@ -1,8 +1,8 @@
 #include "splitVideo.h"
 
-#include "core/tasks/detectCars.h"
+#include "core/tasks/yoloV7/detectCars.h"
 
-TaskSplitVideo::TaskSplitVideo(std::shared_ptr<cv::VideoCapture> video) : Task(Hardware::Type::CPU) {
+TaskSplitVideo::TaskSplitVideo(std::shared_ptr<cv::VideoCapture> video) {
     _video = video;
 }
 

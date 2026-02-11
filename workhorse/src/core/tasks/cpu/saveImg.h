@@ -3,9 +3,9 @@
 #include <opencv2/opencv.hpp>
 #include <filesystem>
 
-#include "core/task.h"
+#include "core/tasks/cpu.h"
 
-class TaskSaveImg : public Task {
+class TaskSaveImg : public TaskCPU {
 public:
     TaskSaveImg(cv::Mat img, std::filesystem::path path);
 

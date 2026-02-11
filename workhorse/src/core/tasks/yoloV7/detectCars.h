@@ -3,9 +3,9 @@
 #include <DarkHelp.hpp>
 #include <memory>
 
-#include "core/task.h"
+#include "core/tasks/yoloV7.h"
 
-class TaskDetectCars : public Task {
+class TaskDetectCars : public TaskYoloV7 {
 public:
     TaskDetectCars(std::shared_ptr<cv::Mat> img_to_process, std::string video_id);
 

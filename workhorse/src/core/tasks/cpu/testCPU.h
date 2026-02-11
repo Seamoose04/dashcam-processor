@@ -1,8 +1,8 @@
 #pragma once
 
-#include "core/task.h"
+#include "core/tasks/cpu.h"
 
-class TaskTestCPU : public Task {
+class TaskTestCPU : public TaskCPU {
 public:
     TaskTestCPU();
 private:
