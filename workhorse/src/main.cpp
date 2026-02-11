@@ -9,8 +9,7 @@
 #include "core/logger.h"
 #include "core/hardware.h"
 #include "core/taskQueue.h"
-// #include "core/tasks/testCPU.h"
-#include "core/tasks/detectCars.h"
+#include "core/tasks/splitVideo.h"
 
 #define MAX_CPU_WORKERS 4
 #define MAX_GPU_WORKERS 4
@@ -62,21 +61,10 @@ int main() {
     }
 
     logger.Log(Logger::Level::Info, "Main::Info worker threads started.\n");
-    
-    // Spawn Tasks
-    // for (unsigned int i = 0; i < 128; i++) {
-    //     tasks->AddTask(std::make_unique<TaskTestCPU>());
-    // }
 
-    cv::Mat img = cv::imread("inputs/road.jpg");
-
-    if (img.data) {
-        tasks->AddTask(std::make_unique<TaskDetectCars>(img));
-    } else {
-        logger.Log(Logger::Level::Error, "Main::Error Image could not be loaded");
-    }
-
-    logger.Log(Logger::Level::Info, "Main::Info Starting.\n");
+    // Add videos to process
+    cv::VideoCapture video("tmp/test.mp4");
+    tasks->AddTask(std::make_unique<TaskSplitVideo>(std::make_shared<cv::VideoCapture>(video)));
 
     // Start processing
     while (tasks->GetInProgressTasks() + tasks->GetUnclaimedTasks() > 0) {

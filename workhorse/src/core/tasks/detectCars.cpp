@@ -5,8 +5,9 @@
 
 #include "core/tasks/saveImg.h"
 
-TaskDetectCars::TaskDetectCars(cv::Mat img_to_process) : Task(Hardware::Type::GPU) {
+TaskDetectCars::TaskDetectCars(std::shared_ptr<cv::Mat> img_to_process, std::string video_id) : Task(Hardware::Type::GPU) {
     _img = img_to_process;
+    _video_id = video_id;
 }
 
 void TaskDetectCars::_Run() {
@@ -21,18 +22,18 @@ void TaskDetectCars::_Run() {
     DarkHelp::NN nn(cfg);
 
     _logger->Log(Logger::Level::Info, "TaskDetectCars::Info Processing Image...\n");
-    const auto result = nn.predict(_img);
+    const auto result = nn.predict(*_img);
 
-    int carID = 0;
+    int car_id = 0;
     for (const auto& prediction : result) {
         if (prediction.best_class == 2) {
             cv::Mat crop;
-            _img(prediction.rect).copyTo(crop);
+            (*_img)(prediction.rect).copyTo(crop);
 
             _logger->Log(Logger::Level::Info, "TaskDetectCars::Info Car found! Spawning TaskSaveImg.\n");
-            _spawn_cb(std::make_unique<TaskSaveImg>(crop, std::format("outputs/car{}.png", carID)));
+            _spawn_cb(std::make_unique<TaskSaveImg>(crop, std::format("outputs/video{}_car{}.png", _video_id, car_id)));
 
-            carID++;
+            car_id++;
         }
     }
 }
