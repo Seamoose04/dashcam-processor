@@ -11,28 +11,31 @@
 #include "core/hardware/yoloV7.h"
 #include "core/taskQueue.h"
 #include "core/tasks/cpu/splitVideo.h"
-
-#define MAX_CPU_WORKERS 4
-#define MAX_GPU_WORKERS 4
-#define LOG_LEVEL Logger::Level::Info
+#include "core/config.h"
+#include "core/tui.h"
 
 int main() {
+    Config config;
+    config.LOG_LEVEL = Logger::Level::Warn;
+    config.MAX_CPU_WORKERS = 8;
+    config.MAX_GPU_WORKERS = 12;
+
     Logger::Config logger_conf;
-    logger_conf.level = LOG_LEVEL;
+    logger_conf.level = config.LOG_LEVEL;
     logger_conf.path = "logs/main.txt";
     Logger logger(logger_conf);
 
     logger.Log(Logger::Level::Info, "Main::Info Initializing...\n");
 
     std::vector<std::unique_ptr<Worker>> cpu_workers;
-    cpu_workers.reserve(MAX_CPU_WORKERS);
+    cpu_workers.reserve(config.MAX_CPU_WORKERS);
 
     std::vector<std::unique_ptr<Worker>> gpu_workers;
-    gpu_workers.reserve(MAX_GPU_WORKERS);
+    gpu_workers.reserve(config.MAX_GPU_WORKERS);
 
-    for (int i = 0; i < MAX_CPU_WORKERS; i++) {
+    for (int i = 0; i < config.MAX_CPU_WORKERS; i++) {
         Logger::Config conf;
-        conf.level = LOG_LEVEL;
+        conf.level = config.LOG_LEVEL;
         conf.path = std::format("logs/cpu_workers/worker{}.txt", i);
 
         std::vector<std::shared_ptr<Hardware>> hardware;
@@ -40,9 +43,9 @@ int main() {
         cpu_workers.push_back(std::make_unique<Worker>(std::move(hardware), conf));
     }
     
-    for (int i = 0; i < MAX_GPU_WORKERS; i++) {
+    for (int i = 0; i < config.MAX_GPU_WORKERS; i++) {
         Logger::Config conf;
-        conf.level = LOG_LEVEL;
+        conf.level = config.LOG_LEVEL;
         conf.path = std::format("logs/gpu_workers/worker{}.txt", i);
 
         std::vector<std::shared_ptr<Hardware>> hardware;
@@ -69,6 +72,9 @@ int main() {
 
     logger.Log(Logger::Level::Info, "Main::Info worker threads started.\n");
 
+    Tui tui(config, tasks);
+    std::thread tui_thread(&Tui::Run, &tui);
+
     // Add videos to process
     cv::VideoCapture video("tmp/test.mp4");
     tasks->AddTask(std::make_unique<TaskSplitVideo>(std::make_shared<cv::VideoCapture>(video)));
@@ -93,6 +99,11 @@ int main() {
     }
     
     logger.Log(Logger::Level::Info, "Main::Info Stopping...\n");
+    
+    tui.Exit();
+    if (tui_thread.joinable()) {
+        tui_thread.join();
+    }
 
     for (auto& worker : cpu_workers) {
         worker->Stop();

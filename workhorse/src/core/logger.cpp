@@ -89,6 +89,25 @@ void Logger::_ReadFIFO() {
     close(fd);
 }
 
+std::string Logger::LevelToString(Level level) {
+    switch (level)
+    {
+    case Level::None:
+        return "None";
+    
+    case Level::Error:
+        return "Error";
+    
+    case Level::Warn:
+        return "Warn";
+    
+    case Level::Info:
+        return "Info";
+    }
+
+    return "Null";
+}
+
 Logger::~Logger() {
     _flags.Add(Flags::Stop);
 

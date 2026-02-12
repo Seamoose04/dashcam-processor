@@ -15,6 +15,7 @@ public:
 
 private:
     mutable std::unique_ptr<DarkHelp::NN> _yolo_v7;
+    static std::mutex _yolo_v7_mutex;
 };
 
 REGISTER_HARDWARE(YoloV7);

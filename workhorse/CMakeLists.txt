@@ -7,11 +7,19 @@ if(NOT UNIX)
     message(FATAL_ERROR "This project can only be built on a Unix-like system (Linux, macOS, etc.). Windows is not supported.")
 endif()
 
+include(FetchContent)
+
 # Packages
 find_package(Threads REQUIRED)
 find_package(OpenCV	REQUIRED)
 find_library(DARKHELP darkhelp)
 find_library(DARKNET darknet)
+
+FetchContent_Declare(ftxui
+	GIT_REPOSITORY https://github.com/ArthurSonzogni/FTXUI
+  	GIT_TAG v6.1.9
+)
+FetchContent_MakeAvailable(ftxui)
 
 include_directories(${OpenCV_INCLUDE_DIRS})
 
@@ -30,4 +38,12 @@ target_include_directories(Workhorse PUBLIC
 )
 
 # Libraries
-target_link_libraries(Workhorse Threads::Threads ${DARKHELP} ${DARKNET} ${OpenCV_LIBS})
+target_link_libraries(Workhorse
+	PRIVATE ftxui::screen
+	PRIVATE ftxui::dom
+	PRIVATE ftxui::component
+	Threads::Threads
+	${DARKHELP}
+	${DARKNET}
+	${OpenCV_LIBS}
+)

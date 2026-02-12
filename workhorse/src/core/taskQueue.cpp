@@ -18,6 +18,9 @@ void TaskQueue::AddTask(std::unique_ptr<Task> task) {
     unclaimed_tasks_lock.unlock();
     
     unclaimed_hardware_tasks.are_tasks_available.notify_one();
+    for (auto& cb : _callbacks) {
+        cb();
+    }
 }
 
 std::shared_ptr<Task> TaskQueue::GetNextTask(std::string type, std::function<bool()> stop_condition) {
@@ -41,6 +44,10 @@ std::shared_ptr<Task> TaskQueue::GetNextTask(std::string type, std::function<boo
     std::unique_lock<std::mutex> unfinished_tasks_lock(_unfinished_tasks_mutex);
     _unfinished_tasks.insert(task);
     unfinished_tasks_lock.unlock();
+
+    for (auto& cb : _callbacks) {
+        cb();
+    }
 
     return task;
 }
@@ -75,4 +82,8 @@ unsigned int TaskQueue::GetInProgressTasks() {
     std::scoped_lock<std::mutex> unfinished_tasks_lock(_unfinished_tasks_mutex);
     unsigned int tasks_in_progress = _unfinished_tasks.size();
     return tasks_in_progress;
+}
+
+void TaskQueue::SubscribeChanges(std::function<void()> callback) {
+    _callbacks.push_back(callback);
 }

@@ -26,9 +26,11 @@ public:
     
     std::unordered_map<std::string, unsigned int> GetTaskCounts();
     unsigned int GetInProgressTasks();
+    void SubscribeChanges(std::function<void()> callback);
     
 private:
     std::unordered_map<std::string, HardwareQueue> _unclaimed_tasks;
     std::unordered_set<std::shared_ptr<Task>> _unfinished_tasks;
     std::mutex _unfinished_tasks_mutex;
+    std::vector<std::function<void()>> _callbacks;
 };

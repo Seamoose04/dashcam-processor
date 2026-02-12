@@ -31,6 +31,7 @@ public:
 
     void Log(Level level, std::string msg);
     std::filesystem::path GetFIFOPath();
+    static std::string LevelToString(Level level);
 
 private:
     void _ReadFIFO();
