@@ -32,3 +32,5 @@ void YoloV7::Unload(Logger* logger) const {
     yolo_v7_lock.unlock();
     logger->Log(Logger::Level::Info, "Hardware::Info Unloaded yolov7.\n");
 }
+
+REGISTER_HARDWARE(YoloV7);

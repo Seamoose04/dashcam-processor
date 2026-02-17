@@ -7,12 +7,13 @@
 
 class TaskDetectCars : public TaskYoloV7 {
 public:
-    TaskDetectCars(std::shared_ptr<cv::Mat> img_to_process, std::string video_id);
+    TaskDetectCars(std::shared_ptr<cv::Mat> img_to_process, std::string video, unsigned int frame);
 
 private:
     void _Run() override;
     void _Finish() override;
 
     std::shared_ptr<cv::Mat> _img;
-    std::string _video_id;
+    std::string _video;
+    unsigned int _frame;
 };

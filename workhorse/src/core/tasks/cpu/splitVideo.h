@@ -12,12 +12,12 @@ public:
         Stop,
         Pause
     };
-    TaskSplitVideo(std::shared_ptr<cv::VideoCapture> video);
+    TaskSplitVideo(std::filesystem::path video_path);
 
 private:
     void _Run() override;
     void _Finish() override;
 
-    std::shared_ptr<cv::VideoCapture> _video;
+    std::filesystem::path _video_path;
     Flag<Flags> _flags;
 };

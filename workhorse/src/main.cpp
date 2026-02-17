@@ -50,6 +50,7 @@ int main() {
 
         std::vector<std::shared_ptr<Hardware>> hardware;
         hardware.push_back(Registry<Hardware>::Instance().Create("YoloV7"));
+        hardware.push_back(Registry<Hardware>::Instance().Create("LPR"));
         gpu_workers.push_back(std::make_unique<Worker>(std::move(hardware), conf));
     }
 
@@ -76,8 +77,7 @@ int main() {
     std::thread tui_thread(&Tui::Run, &tui);
 
     // Add videos to process
-    cv::VideoCapture video("tmp/test.mp4");
-    tasks->AddTask(std::make_unique<TaskSplitVideo>(std::make_shared<cv::VideoCapture>(video)));
+    tasks->AddTask(std::make_unique<TaskSplitVideo>("tmp/test.mp4"));
 
     // Start processing
     for (;;) {

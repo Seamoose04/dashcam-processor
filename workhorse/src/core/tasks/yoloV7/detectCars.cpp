@@ -1,10 +1,12 @@
 #include "detectCars.h"
 
-#include "core/tasks/cpu/saveImg.h"
+#include "core/tasks/lpr/detectLicensePlates.h"
+#include "core/car.h"
 
-TaskDetectCars::TaskDetectCars(std::shared_ptr<cv::Mat> img_to_process, std::string video_id) {
+TaskDetectCars::TaskDetectCars(std::shared_ptr<cv::Mat> img_to_process, std::string video, unsigned int frame) {
     _img = img_to_process;
-    _video_id = video_id;
+    _video = video;
+    _frame = frame;
 }
 
 void TaskDetectCars::_Run() {
@@ -22,8 +24,13 @@ void TaskDetectCars::_Run() {
             cv::Mat crop;
             (*_img)(prediction.rect).copyTo(crop);
 
-            _logger->Log(Logger::Level::Info, "TaskDetectCars::Info Car found! Spawning TaskSaveImg.\n");
-            _spawn_cb(std::make_unique<TaskSaveImg>(crop, std::format("outputs/video{}_car{}.png", _video_id, car_id)));
+            _logger->Log(Logger::Level::Info, "TaskDetectCars::Info Car found!\n");
+
+            Car car;
+            car.video = _video;
+            car.frame = _frame;
+            car.id = car_id;
+            _spawn_cb(std::make_unique<TaskDetectLicensePlates>(std::make_shared<cv::Mat>(crop), car));
 
             car_id++;
         }

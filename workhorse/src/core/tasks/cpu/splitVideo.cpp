@@ -2,12 +2,14 @@
 
 #include "core/tasks/yoloV7/detectCars.h"
 
-TaskSplitVideo::TaskSplitVideo(std::shared_ptr<cv::VideoCapture> video) {
-    _video = video;
+TaskSplitVideo::TaskSplitVideo(std::filesystem::path video_path) {
+    _video_path = video_path; 
 }
 
 void TaskSplitVideo::_Run() {
-    if (!_video->isOpened()) {
+    cv::VideoCapture video(_video_path);
+
+    if (!video.isOpened()) {
         _logger->Log(Logger::Level::Error, "TaskSplitVideo::Error Video not open.\n");
         return;
     }
@@ -15,14 +17,14 @@ void TaskSplitVideo::_Run() {
     unsigned int frame_id = 0;
     while (!_flags.Get(Flags::Stop)) {
         cv::Mat frame;
-        *_video >> frame;
+        video >> frame;
 
         if (frame.empty()) {
             _logger->Log(Logger::Level::Info, "TaskSplitVideo::Info Final frame complete.\n");
             return;
         }
 
-        _spawn_cb(std::make_unique<TaskDetectCars>(std::make_shared<cv::Mat>(frame), std::to_string(frame_id)));
+        _spawn_cb(std::make_unique<TaskDetectCars>(std::make_shared<cv::Mat>(frame), _video_path.filename(), frame_id));
 
         frame_id++;
     }

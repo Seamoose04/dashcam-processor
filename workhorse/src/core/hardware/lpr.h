@@ -5,15 +5,15 @@
 
 #include "core/hardware.h"
 
-class YoloV7 : public Hardware {
+class LPR : public Hardware {
 public:
-    YoloV7();
+    LPR();
 
     void Load(Logger* logger) const override;
     void Process(std::shared_ptr<Task> task, Logger* logger, std::shared_ptr<TaskQueue> queue) const override;
     void Unload(Logger* logger) const override;
 
 private:
-    mutable std::unique_ptr<DarkHelp::NN> _yolo_v7;
-    static std::mutex _yolo_v7_mutex;
+    mutable std::unique_ptr<DarkHelp::NN> _lpr;
+    static std::mutex _lpr_mutex;
 };
