@@ -1,13 +1,13 @@
 #include "saveImg.h"
 
-TaskSaveImg::TaskSaveImg(cv::Mat img, std::filesystem::path path) {
+TaskSaveImg::TaskSaveImg(std::shared_ptr<cv::Mat> img, std::filesystem::path path) {
     _img = img;
     _path = path;
 }
 
 void TaskSaveImg::_Run() {
     _logger->Log(Logger::Level::Info, "TaskSaveImg::Info Saving image...\n");
-    cv::imwrite(_path, _img);
+    cv::imwrite(_path, *_img);
 }
 
 void TaskSaveImg::_Finish() {

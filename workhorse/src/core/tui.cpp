@@ -62,6 +62,7 @@ void Tui::Run() {
 
     component |= ftxui::CatchEvent([this] (ftxui::Event event) {
         if (event == ftxui::Event::Character('q')) {
+            _flags.Add(Flags::Quit);
             _screen.Exit();
             return true;
         }
@@ -80,4 +81,8 @@ void Tui::Run() {
 void Tui::Exit() {
     _flags.Add(Flags::Stop);
     _screen.Post(ftxui::Event::Custom);
+}
+
+bool Tui::QuitRequested() {
+    return _flags.Get(Flags::Quit);
 }

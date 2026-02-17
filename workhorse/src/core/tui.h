@@ -12,11 +12,14 @@ class Tui {
 public:
     enum class Flags {
         Stop,
-        Refreshing
+        Refreshing,
+        Quit
     };
     Tui(Config config, std::shared_ptr<TaskQueue> queue);
     void Run();
     void Exit();
+    
+    bool QuitRequested();
     
 private:
     ftxui::Component GetComponent();

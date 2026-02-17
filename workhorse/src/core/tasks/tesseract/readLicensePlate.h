@@ -3,12 +3,12 @@
 #include <opencv2/opencv.hpp>
 #include <memory>
 
-#include "core/tasks/lpr.h"
+#include "core/tasks/tesseract.h"
 #include "core/car.h"
 
-class TaskDetectLicensePlates : public TaskLPR {
+class TaskReadLicensePlate : public TaskTesseract {
 public:
-    TaskDetectLicensePlates(std::shared_ptr<cv::Mat> img_to_process, Car car);
+    TaskReadLicensePlate(std::shared_ptr<cv::Mat> lp_img, Car car);
 
 private:
     void _Run() override;

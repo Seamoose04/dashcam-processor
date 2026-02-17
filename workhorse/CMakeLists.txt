@@ -12,8 +12,11 @@ include(FetchContent)
 # Packages
 find_package(Threads REQUIRED)
 find_package(OpenCV	REQUIRED)
+find_package(PkgConfig REQUIRED)
 find_library(DARKHELP darkhelp)
 find_library(DARKNET darknet)
+
+pkg_check_modules(TESSERACT REQUIRED tesseract)
 
 FetchContent_Declare(ftxui
 	GIT_REPOSITORY https://github.com/ArthurSonzogni/FTXUI
@@ -35,6 +38,7 @@ add_executable(Workhorse ${WORKHORSE_SOURCES})
 # Include
 target_include_directories(Workhorse PUBLIC
 	${CMAKE_CURRENT_SOURCE_DIR}/src
+	${TESSERACT_INCLUDE_DIRS}
 )
 
 # Libraries
@@ -46,4 +50,5 @@ target_link_libraries(Workhorse
 	${DARKHELP}
 	${DARKNET}
 	${OpenCV_LIBS}
+	${TESSERACT_LIBRARIES}
 )

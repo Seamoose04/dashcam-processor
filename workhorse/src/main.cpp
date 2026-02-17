@@ -9,6 +9,8 @@
 #include "core/logger.h"
 #include "core/hardware/cpu.h"
 #include "core/hardware/yoloV7.h"
+#include "core/hardware/lpr.h"
+#include "core/hardware/tesseract.h"
 #include "core/taskQueue.h"
 #include "core/tasks/cpu/splitVideo.h"
 #include "core/config.h"
@@ -16,7 +18,7 @@
 
 int main() {
     Config config;
-    config.LOG_LEVEL = Logger::Level::Warn;
+    config.LOG_LEVEL = Logger::Level::Info;
     config.MAX_CPU_WORKERS = 8;
     config.MAX_GPU_WORKERS = 12;
 
@@ -40,6 +42,7 @@ int main() {
 
         std::vector<std::shared_ptr<Hardware>> hardware;
         hardware.push_back(Registry<Hardware>::Instance().Create("CPU"));
+        hardware.push_back(Registry<Hardware>::Instance().Create("Tesseract"));
         cpu_workers.push_back(std::make_unique<Worker>(std::move(hardware), conf));
     }
     
@@ -82,6 +85,10 @@ int main() {
     // Start processing
     for (;;) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+        if (tui.QuitRequested()) {
+            break;
+        }
 
         if (tasks->GetInProgressTasks() == 0) {
             std::unordered_map<std::string, unsigned int> counts = tasks->GetTaskCounts();
