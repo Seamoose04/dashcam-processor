@@ -1,50 +1,45 @@
 #include "worker.h"
 
-Worker::Worker(std::vector<std::shared_ptr<Hardware>> types, Logger::Config logger_conf)
-    : _types(std::move(types)), _logger(std::make_unique<Logger>(logger_conf)) {}
+Worker::Worker(Logger::Config logger_conf)
+    : _logger(std::make_unique<Logger>(logger_conf)) {}
 
 void Worker::Work(std::shared_ptr<TaskQueue> queue) {
     _queue = std::move(queue);
 
-    auto current_type = &(*_types.begin());
-    current_type->get()->Load(_logger.get());
-
     while (!_flags.Get(Flags::Stop)) {
-        _flags.Add(Flags::Idle);
-
-        std::unordered_map<std::string, unsigned int> task_counts = _queue->GetTaskCounts();
-        if (task_counts[current_type->get()->GetTypeName()] == 0) {
-            std::string new_type_name = current_type->get()->GetTypeName();
-            for (auto& type : _types) {
-                if (task_counts[type.get()->GetTypeName()] > task_counts[new_type_name]) {
-                    new_type_name = type.get()->GetTypeName();
-                }
-            }
-
-            if (current_type->get()->GetTypeName() != new_type_name) {
-                for (auto& type : _types) {
-                    if (type.get()->GetTypeName() == new_type_name) {
-                        current_type->get()->Unload(_logger.get());
-                        current_type = &type;
-                        current_type->get()->Load(_logger.get());
-                    }
-                }
-            }
+        if (_type == nullptr) {
+            _flags.Add(Flags::Idle);
+            _signal.acquire();
         }
 
-        _current_task = _queue->GetNextTask(
-            current_type->get()->GetTypeName(), 
-            [this]() -> bool {
-                return _flags.Get(Flags::Stop);
-            }
-        );
-        if (_current_task == nullptr) {
-            break;
-        }
         _flags.Clear(Flags::Idle);
-        current_type->get()->Process(_current_task, _logger.get(), _queue);
-        _queue->TaskFinished(_current_task);
+        _task = _queue->GetNextTask(_type->GetTypeName());
+        if (_task == nullptr) {
+            size_t subscription_id = _queue->SubscribeChanges([this]() { _signal.release(); }, _type->GetTypeName());
+            _task = _queue->GetNextTask(_type->GetTypeName());
+            if (_task == nullptr) {
+                _flags.Add(Flags::Idle);
+                _signal.acquire();
+                _queue->UnsubscribeChanges(subscription_id);
+                
+                continue;
+            } else {
+                _queue->UnsubscribeChanges(subscription_id);
+            }
+        }
+
+        _type->Process(_task, _logger.get(), _queue);
+        _queue->TaskFinished(_task);
     }
+}
+
+void Worker::SetType(std::unique_ptr<Hardware> type) {
+    if (_type != nullptr) {
+        _type->Unload(_logger.get());
+    }
+    _type = std::move(type);
+    _type->Load(_logger.get());
+    _signal.release();
 }
 
 void Worker::Stop() {

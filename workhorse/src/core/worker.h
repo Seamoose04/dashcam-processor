@@ -3,6 +3,8 @@
 #include <filesystem>
 #include <memory>
 #include <vector>
+#include <mutex>
+#include <semaphore>
 
 #include "core/hardware.h"
 #include "core/logger.h"
@@ -14,19 +16,21 @@ class Worker {
 public:
     enum class Flags {
         Idle,
-        Stop,
+        Stop
     };
 
-    Worker(std::vector<std::shared_ptr<Hardware>> types, Logger::Config logger_conf);
+    Worker(Logger::Config logger_conf);
     void Work(std::shared_ptr<TaskQueue> queue);
     void Stop();
+    void SetType(std::unique_ptr<Hardware> type);
 
     bool GetIsIdle();
 
 private:
-    std::vector<std::shared_ptr<Hardware>> _types;
     Flag<Flags> _flags;
     std::shared_ptr<TaskQueue> _queue;
-    std::shared_ptr<Task> _current_task;
+    std::shared_ptr<Task> _task;
 	std::unique_ptr<Logger> _logger;
+    std::unique_ptr<Hardware> _type;
+    std::binary_semaphore _signal{0};
 };

@@ -17,7 +17,7 @@ public:
     };
     Tui(Config config, std::shared_ptr<TaskQueue> queue);
     void Run();
-    void Exit();
+    void Stop();
     
     bool QuitRequested();
     

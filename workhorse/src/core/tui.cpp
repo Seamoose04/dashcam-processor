@@ -16,8 +16,7 @@ ftxui::Component Tui::GetComponent() {
         
         // Config with nice spacing
         auto config_grid = ftxui::gridbox({
-            {ftxui::text("CPU Workers: "), ftxui::text(std::to_string(_config.MAX_CPU_WORKERS)) | ftxui::bold},
-            {ftxui::text("GPU Workers: "), ftxui::text(std::to_string(_config.MAX_GPU_WORKERS)) | ftxui::bold},
+            {ftxui::text("Workers: "), ftxui::text(std::to_string(_config.MAX_WORKERS)) | ftxui::bold},
             {ftxui::text("Log Level: "), ftxui::text(Logger::LevelToString(_config.LOG_LEVEL)) | ftxui::bold}
         });
         
@@ -78,7 +77,7 @@ void Tui::Run() {
     _screen.Loop(component);
 }
 
-void Tui::Exit() {
+void Tui::Stop() {
     _flags.Add(Flags::Stop);
     _screen.Post(ftxui::Event::Custom);
 }
