@@ -6,7 +6,7 @@
 
 std::mutex Tesseract::_tess_mutex;
 
-Tesseract::Tesseract() { }
+Tesseract::Tesseract() : Hardware("Tesseract") { }
 
 void Tesseract::Load(Logger* logger) const {
     logger->Log(Logger::Level::Info, "Hardware::Info Loading tesseract...\n");

@@ -1,15 +1,14 @@
 #include <cstdlib>
-#include <vector>
 #include <memory>
 #include <thread>
 #include <format>
 #include <opencv2/opencv.hpp>
 
-#include "core/worker.h"
 #include "core/logger.h"
 #include "core/scheduler.h"
 #include "core/taskQueue.h"
 #include "core/tasks/cpu/splitVideo.h"
+#include "core/tasks/cpu/testCPU.h"
 #include "core/config.h"
 #include "core/tui.h"
 
@@ -39,7 +38,8 @@ int main() {
     std::thread scheduler_thread(&Scheduler::Run, &scheduler, tasks);
 
     // Add videos to process
-    tasks->AddTask(std::make_unique<TaskSplitVideo>("tmp/test.mp4"));
+    // tasks->AddTask(std::make_unique<TaskSplitVideo>("tmp/test.mp4"));
+	tasks->AddTask(std::make_unique<TaskTestCPU>());
 
     // Wait
     for (;;) {

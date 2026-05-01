@@ -2,8 +2,8 @@
 
 #include "core/task.h"
 
-Hardware::Hardware(Resources required_resources) {
-    _required_resources = required_resources;
+Hardware::Hardware(std::string type_name) {
+	_type_name = type_name;
 }
 
 bool Hardware::operator==(const Hardware& other) const {

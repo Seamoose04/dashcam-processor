@@ -6,7 +6,7 @@
 
 std::mutex YoloV7::_yolo_v7_mutex;
 
-YoloV7::YoloV7() {}
+YoloV7::YoloV7() : Hardware("YoloV7") {}
 
 void YoloV7::Load(Logger* logger) const {
     logger->Log(Logger::Level::Info, "Hardware::Info Loading yolov7...\n");

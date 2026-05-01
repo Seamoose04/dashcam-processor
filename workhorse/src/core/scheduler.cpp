@@ -8,7 +8,7 @@ Scheduler::Scheduler(unsigned int num_workers, Logger::Config log_conf) {
     for (unsigned int i = 0; i < num_workers; i++) {
         Logger::Config worker_log_conf = log_conf;
         worker_log_conf.path /= std::format("worker{}.txt", i);
-        _workers.emplace_back(log_conf);
+        _workers.push_back(std::make_unique<Worker>(worker_log_conf));
     }
 }
 
@@ -16,7 +16,7 @@ void Scheduler::Run(std::shared_ptr<TaskQueue> task_queue) {
     std::shared_ptr<TaskQueue> tasks = std::move(task_queue);
     _worker_threads.reserve(_workers.size());
     for (auto& worker : _workers) {
-        _worker_threads.emplace_back(&Worker::Work, &worker, tasks);
+        _worker_threads.emplace_back(&Worker::Work, worker.get(), tasks);
     }
 
     while (!_flags.Get(Flags::Quit)) {
@@ -40,9 +40,8 @@ void Scheduler::Run(std::shared_ptr<TaskQueue> task_queue) {
 
 void Scheduler::Stop() {
     for (auto& worker : _workers) {
-        worker.Stop();
+        worker->Stop();
     }
-    // TODO: Notify all
     for (auto& worker_thread : _worker_threads) {
         if (worker_thread.joinable()) {
             worker_thread.join();

@@ -1,3 +1,5 @@
 dataset/*
-backup/*
 !dataset/README.md
+
+chart.png
+char_license_plate.png

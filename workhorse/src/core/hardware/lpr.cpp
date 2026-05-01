@@ -6,7 +6,7 @@
 
 std::mutex LPR::_lpr_mutex;
 
-LPR::LPR() {}
+LPR::LPR() : Hardware("LPR") {}
 
 void LPR::Load(Logger* logger) const {
     logger->Log(Logger::Level::Info, "Hardware::Info Loading lpr...\n");

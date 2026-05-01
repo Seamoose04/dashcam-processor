@@ -1,11 +1,8 @@
 #pragma once
 
 #include <vector>
-#include <string>
 #include <thread>
-#include <functional>
 
-#include "core/hardware.h"
 #include "core/worker.h"
 #include "core/logger.h"
 #include "core/taskQueue.h"
@@ -24,7 +21,7 @@ public:
     bool StopRequested();
 
 private:
-    std::vector<Worker> _workers;
+    std::vector<std::unique_ptr<Worker>> _workers;
     std::vector<std::thread> _worker_threads;
     Flag<Flags> _flags;
 };

@@ -6,6 +6,7 @@
 Logger::Logger(Config conf) {
     _level = conf.level;
     _log_path = conf.path;
+	std::filesystem::create_directories(_log_path.parent_path());
     _out_file = std::ofstream(_log_path, std::ios_base::app);
 
     _fifo_path = _log_path.parent_path() / ("fifo_" + _log_path.filename().string());

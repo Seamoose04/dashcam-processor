@@ -52,14 +52,6 @@ void TaskQueue::TaskFinished(std::shared_ptr<Task> task) {
     _callbacks.Call();
 }
 
-// void TaskQueue::NotifyAll() {
-//     auto types = Registry<Hardware>::Instance().GetRegisteredTypes();
-//     for (auto& type : types) {
-//         HardwareQueue& unclaimed_hardware_tasks = _unclaimed_tasks[type];
-//         unclaimed_hardware_tasks.are_tasks_available.notify_all();
-//     }
-// }
-
 std::unordered_map<std::string, unsigned int> TaskQueue::GetTaskCounts() {
     std::unordered_map<std::string, unsigned int> counts;
     auto types = Registry<Hardware>::Instance().GetRegisteredTypes();

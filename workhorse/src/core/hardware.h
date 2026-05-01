@@ -1,6 +1,5 @@
 #pragma once
 
-#include <unordered_set>
 #include <string>
 #include <memory>
 
@@ -18,7 +17,7 @@ struct Resources {
 
 class Hardware {
 public:
-    Hardware(Resources required_resources);
+    Hardware(std::string type_name);
     virtual ~Hardware() = default;
 
     bool operator==(const Hardware& other) const;

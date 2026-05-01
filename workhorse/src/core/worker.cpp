@@ -10,6 +10,7 @@ void Worker::Work(std::shared_ptr<TaskQueue> queue) {
         if (_type == nullptr) {
             _flags.Add(Flags::Idle);
             _signal.acquire();
+			continue;
         }
 
         _flags.Clear(Flags::Idle);
@@ -44,6 +45,7 @@ void Worker::SetType(std::unique_ptr<Hardware> type) {
 
 void Worker::Stop() {
     _flags.Add(Flags::Stop);
+	_signal.release();
 }
 
 bool Worker::GetIsIdle() {
