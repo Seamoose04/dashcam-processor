@@ -1,5 +1,6 @@
 #include "logger.h"
 
+#include <unistd.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 
@@ -22,7 +23,7 @@ Logger::Logger(Config conf) {
 void Logger::Log(Level level, std::string msg) {
     std::scoped_lock<std::mutex> logging_lock(_logging_mutex);
     if (static_cast<int>(level) <= static_cast<int>(_level)) {
-        _out_file << msg;
+        _out_file << msg << std::flush;
     }
 }
 

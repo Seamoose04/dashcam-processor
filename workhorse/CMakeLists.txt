@@ -3,6 +3,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# OS check
 if(NOT UNIX)
     message(FATAL_ERROR "This project can only be built on a Unix-like system (Linux, macOS, etc.). Windows is not supported.")
 endif()
@@ -13,6 +14,7 @@ include(FetchContent)
 find_package(Threads REQUIRED)
 find_package(OpenCV	REQUIRED)
 find_package(PkgConfig REQUIRED)
+find_package(CUDAToolkit REQUIRED)
 find_library(DARKHELP darkhelp)
 find_library(DARKNET darknet)
 
@@ -35,6 +37,9 @@ file(GLOB_RECURSE WORKHORSE_SOURCES CONFIGURE_DEPENDS
 # Workhorse library
 add_executable(Workhorse ${WORKHORSE_SOURCES})
 
+# Debugging
+target_compile_options(Workhorse PRIVATE -g -fno-omit-frame-pointer)
+
 # Include
 target_include_directories(Workhorse PUBLIC
 	${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -46,6 +51,7 @@ target_link_libraries(Workhorse
 	PRIVATE ftxui::screen
 	PRIVATE ftxui::dom
 	PRIVATE ftxui::component
+	PRIVATE CUDA::nvml
 	Threads::Threads
 	${DARKHELP}
 	${DARKNET}

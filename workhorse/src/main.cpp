@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <memory>
+#include <semaphore>
 #include <thread>
 #include <format>
 #include <opencv2/opencv.hpp>
@@ -16,6 +17,7 @@ int main() {
     Config config;
     config.LOG_LEVEL = Logger::Level::Info;
     config.MAX_WORKERS = 64;
+	config.AVAILABLE_VRAM = 20.0f;
 
     Logger::Config logger_conf;
     logger_conf.level = config.LOG_LEVEL;
@@ -27,7 +29,10 @@ int main() {
     Logger::Config worker_logger_config;
     worker_logger_config.level = config.LOG_LEVEL;
     worker_logger_config.path = "logs/workers";
-    Scheduler scheduler(config.MAX_WORKERS, worker_logger_config);
+	Logger::Config scheduler_logger_config;
+	scheduler_logger_config.level = config.LOG_LEVEL;
+	scheduler_logger_config.path = "logs/scheduler.txt";
+    Scheduler scheduler(config, worker_logger_config, scheduler_logger_config);
 
     logger.Log(Logger::Level::Info, std::format("Main::Info Spawned {} workers\n", config.MAX_WORKERS));
 
@@ -38,34 +43,29 @@ int main() {
     std::thread scheduler_thread(&Scheduler::Run, &scheduler, tasks);
 
     // Add videos to process
-    // tasks->AddTask(std::make_unique<TaskSplitVideo>("tmp/test.mp4"));
-	tasks->AddTask(std::make_unique<TaskTestCPU>());
+    tasks->AddTask(std::make_unique<TaskSplitVideo>("tmp/test.mp4"));
+	// tasks->AddTask(std::make_unique<TaskTestCPU>());
 
     // Wait
-    for (;;) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+	std::binary_semaphore shutdown(0);
+	auto trigger = [&shutdown]{ shutdown.release(); };
+	tui.onComplete.Subscribe(trigger);
+	scheduler.onComplete.Subscribe(trigger);
+	shutdown.acquire();
 
-        if (tui.QuitRequested()) {
-            scheduler.Stop();
-            break;
-        }
-
-        if (scheduler.StopRequested()) {
-            tui.Stop();
-            break;
-        }
-    }
-    
-    logger.Log(Logger::Level::Info, "Main::Info Stopping...\n");
+	// Stop + Cleanup
+	logger.Log(Logger::Level::Info, "Main::Info Stopping...\n");
+	tui.Stop();
+	scheduler.Stop();
 
     if (tui_thread.joinable()) {
         tui_thread.join();
     }
-
     if (scheduler_thread.joinable()) {
         scheduler_thread.join();
     }
 
+	// Finished
     logger.Log(Logger::Level::Info, "Main::Info Stopped.\n");
 
     return EXIT_SUCCESS;

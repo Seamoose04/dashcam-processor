@@ -5,12 +5,11 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
-#include <iostream>
 
 template<typename BaseType>
 class Registry {
 public:
-    using Creator = std::function<std::shared_ptr<BaseType>()>;
+    using Creator = std::function<std::unique_ptr<BaseType>()>;
 
     static Registry& Instance() {
         static Registry inst;
@@ -22,7 +21,7 @@ public:
         return inserted;
     }
 
-    std::shared_ptr<BaseType> Create(const std::string& name) const {
+    std::unique_ptr<BaseType> Create(const std::string& name) const {
         auto it = _creators.find(name);
         if (it != _creators.end()){
             auto instance = (it->second)();
@@ -52,7 +51,7 @@ private:
             DerivedType##__AutoRegistrar() {                                \
                 (void)Registry<BaseType>::Instance().Register(              \
                     #DerivedType,                                           \
-                    [] { return std::make_shared<DerivedType>(); }          \
+                    [] { return std::make_unique<DerivedType>(); }          \
                 );                                                          \
             }                                                               \
         };                                                                  \

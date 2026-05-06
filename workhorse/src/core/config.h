@@ -5,4 +5,5 @@
 struct Config {
     unsigned int MAX_WORKERS;
     Logger::Level LOG_LEVEL;
+	float AVAILABLE_VRAM;
 };

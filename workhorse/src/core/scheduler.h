@@ -1,27 +1,28 @@
 #pragma once
 
 #include <vector>
+#include <unordered_map>
 #include <thread>
+#include <atomic>
 
+#include "core/config.h"
 #include "core/worker.h"
 #include "core/logger.h"
 #include "core/taskQueue.h"
-#include "util/flag.h"
+#include "core/resources.h"
+#include "util/service.h"
 
-class Scheduler {
+class Scheduler : public Service {
 public:
-    enum class Flags {
-        Stop,
-        Quit
-    };
-    Scheduler(unsigned int num_workers, Logger::Config log_conf);
+    Scheduler(Config conf, Logger::Config worker_log_conf, Logger::Config log_conf);
     void Run(std::shared_ptr<TaskQueue> task_queue);
-    void Quit();
     void Stop();
-    bool StopRequested();
 
 private:
+	float _available_vram;
+	Logger _logger;
     std::vector<std::unique_ptr<Worker>> _workers;
     std::vector<std::thread> _worker_threads;
-    Flag<Flags> _flags;
+	std::unordered_map<std::string, Resources> _resources;
+	std::atomic<bool> _quit{false};
 };

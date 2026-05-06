@@ -18,6 +18,3 @@ void Hardware::SetTypeName(std::string name) {
     _type_name = name;
 }
 
-Resources Hardware::GetRequiredResources() {
-    return _required_resources;
-}

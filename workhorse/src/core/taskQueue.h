@@ -2,6 +2,7 @@
 
 #include <queue>
 #include <unordered_map>
+#include <unordered_set>
 #include <mutex>
 #include <memory>
 #include <functional>
@@ -21,8 +22,6 @@ public:
     void AddTask(std::unique_ptr<Task> task);
     std::shared_ptr<Task> GetNextTask(std::string type);
     void TaskFinished(std::shared_ptr<Task> task);
-    
-    // void NotifyAll();
     
     std::unordered_map<std::string, unsigned int> GetTaskCounts();
     unsigned int GetInProgressTasks();

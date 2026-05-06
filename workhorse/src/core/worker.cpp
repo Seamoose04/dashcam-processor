@@ -22,7 +22,6 @@ void Worker::Work(std::shared_ptr<TaskQueue> queue) {
                 _flags.Add(Flags::Idle);
                 _signal.acquire();
                 _queue->UnsubscribeChanges(subscription_id);
-                
                 continue;
             } else {
                 _queue->UnsubscribeChanges(subscription_id);
@@ -40,6 +39,7 @@ void Worker::SetType(std::unique_ptr<Hardware> type) {
     }
     _type = std::move(type);
     _type->Load(_logger.get());
+	_flags.Clear(Flags::Idle);
     _signal.release();
 }
 
@@ -51,3 +51,7 @@ void Worker::Stop() {
 bool Worker::GetIsIdle() {
     return _flags.Get(Flags::Idle);
 }
+
+const Hardware* Worker::GetType() const {
+	return _type.get();
+};

@@ -7,19 +7,17 @@
 #include "core/taskQueue.h"
 #include "core/config.h"
 #include "util/flag.h"
+#include "util/service.h"
  
-class Tui {
+class Tui : public Service {
 public:
     enum class Flags {
-        Stop,
         Refreshing,
         Quit
     };
     Tui(Config config, std::shared_ptr<TaskQueue> queue);
     void Run();
     void Stop();
-    
-    bool QuitRequested();
     
 private:
     ftxui::Component GetComponent();

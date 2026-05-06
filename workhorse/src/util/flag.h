@@ -25,7 +25,7 @@ public:
             Clear(flag);
         }
     }
-    bool Get(Enum flag) {
+    bool Get(Enum flag) const {
         return _states.load(std::memory_order_acquire) & (1ULL << static_cast<unsigned int>(flag));
     }
 

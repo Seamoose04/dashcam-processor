@@ -12,7 +12,7 @@ void LPR::Load(Logger* logger) const {
     logger->Log(Logger::Level::Info, "Hardware::Info Loading lpr...\n");
     std::scoped_lock<std::mutex> yolo_v7_lock(_lpr_mutex);
     Darknet::set_output_stream(logger->GetFIFOPath());
-    _lpr = std::make_unique<DarkHelp::NN>("models/lpr/lpr.cfg", "models/lpr/backup/lpr_best.weights", "models/lpr/train/darknet_dataset/obj.names");
+    _lpr = std::make_unique<DarkHelp::NN>("models/lpr/lpr.cfg", "models/lpr/train/darknet_dataset/backup/lpr_best.weights", "models/lpr/train/darknet_dataset/obj.names");
 }
 
 void LPR::Process(std::shared_ptr<Task> task, Logger* logger, std::shared_ptr<TaskQueue> queue) const {

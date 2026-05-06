@@ -20,6 +20,7 @@ public:
     void Work(std::shared_ptr<TaskQueue> queue);
     void Stop();
     void SetType(std::unique_ptr<Hardware> type);
+	const Hardware* GetType() const;
 
     bool GetIsIdle();
 

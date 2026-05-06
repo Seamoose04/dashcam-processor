@@ -1,6 +1,8 @@
 #include "detectLicensePlates.h"
 
+#include "core/tasks/cpu/saveImg.h"
 #include "core/tasks/tesseract/readLicensePlate.h"
+#include <format>
 
 TaskDetectLicensePlates::TaskDetectLicensePlates(std::shared_ptr<cv::Mat> img_to_process, Car car) {
     _img = img_to_process;
@@ -22,6 +24,7 @@ void TaskDetectLicensePlates::_Run() {
 
             _logger->Log(Logger::Level::Info, "TaskDetectLicensePlates::Info License plate found! Attempting to read...\n");
             _spawn_cb(std::make_unique<TaskReadLicensePlate>(std::make_shared<cv::Mat>(crop), _car));
+			_spawn_cb(std::make_unique<TaskSaveImg>(std::make_shared<cv::Mat>(crop), std::format("outputs/{}.png", _car.frame)));
         }
     }
 }
