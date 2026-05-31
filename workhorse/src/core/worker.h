@@ -1,7 +1,9 @@
 #pragma once
 
+#include <condition_variable>
 #include <memory>
-#include <semaphore>
+#include <mutex>
+#include <atomic>
 
 #include "core/hardware.h"
 #include "core/logger.h"
@@ -26,9 +28,11 @@ public:
 
 private:
     Flag<Flags> _flags;
+	std::atomic<size_t> _pending_subscription;
     std::shared_ptr<TaskQueue> _queue;
     std::shared_ptr<Task> _task;
 	std::unique_ptr<Logger> _logger;
     std::unique_ptr<Hardware> _type;
-    std::binary_semaphore _signal{0};
+	std::mutex _type_mutex;
+    std::condition_variable _cv;
 };

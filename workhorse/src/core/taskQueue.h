@@ -26,8 +26,10 @@ public:
     std::unordered_map<std::string, unsigned int> GetTaskCounts();
     unsigned int GetInProgressTasks();
     size_t SubscribeChanges(std::function<void()> callback);
+	size_t SubscribeChangesOnce(std::function<void()> callback);
     void UnsubscribeChanges(size_t id);
     size_t SubscribeChanges(std::function<void()> callback, std::string type);
+	size_t SubscribeChangesOnce(std::function<void()> callback, std::string type);
     void UnsubscribeChanges(size_t id, std::string type);
     
 private:

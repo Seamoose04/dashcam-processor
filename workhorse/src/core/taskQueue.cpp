@@ -74,6 +74,10 @@ size_t TaskQueue::SubscribeChanges(std::function<void()> callback) {
     return _callbacks.Subscribe(std::move(callback));
 }
 
+size_t TaskQueue::SubscribeChangesOnce(std::function<void()> callback) {
+	return _callbacks.SubscribeOnce(std::move(callback));
+}
+
 void TaskQueue::UnsubscribeChanges(size_t id) {
     _callbacks.Unsubscribe(id);
 }
@@ -81,6 +85,11 @@ void TaskQueue::UnsubscribeChanges(size_t id) {
 size_t TaskQueue::SubscribeChanges(std::function<void()> callback, std::string type) {
     HardwareQueue& unclaimed_hardware_tasks = _unclaimed_tasks[type];
     return unclaimed_hardware_tasks.callbacks.Subscribe(callback);
+}
+
+size_t TaskQueue::SubscribeChangesOnce(std::function<void()> callback, std::string type) {
+	HardwareQueue& unclaimed_hardware_tasks = _unclaimed_tasks[type];
+	return unclaimed_hardware_tasks.callbacks.SubscribeOnce(callback);
 }
 
 void TaskQueue::UnsubscribeChanges(size_t id, std::string type) {

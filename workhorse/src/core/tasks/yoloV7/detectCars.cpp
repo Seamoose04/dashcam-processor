@@ -1,6 +1,7 @@
 #include "detectCars.h"
 
 #include "core/tasks/lpr/detectLicensePlates.h"
+#include "core/tasks/cpu/saveImg.h"
 #include "core/car.h"
 
 TaskDetectCars::TaskDetectCars(std::shared_ptr<cv::Mat> img_to_process, std::string video, unsigned int frame) {
@@ -31,6 +32,7 @@ void TaskDetectCars::_Run() {
             car.frame = _frame;
             car.id = car_id;
             _spawn_cb(std::make_unique<TaskDetectLicensePlates>(std::make_shared<cv::Mat>(crop), car));
+			_spawn_cb(std::make_unique<TaskSaveImg>(std::make_shared<cv::Mat>(crop), std::format("outputs/car_{}.png", car.frame)));
 
             car_id++;
         }

@@ -8,6 +8,7 @@ class Callback {
 public:
     Callback();
     size_t Subscribe(std::function<void()> callback);
+	size_t SubscribeOnce(std::function<void()> callback);
     void Unsubscribe(size_t id);
     void Call();
 

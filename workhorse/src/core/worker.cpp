@@ -7,45 +7,71 @@ void Worker::Work(std::shared_ptr<TaskQueue> queue) {
     _queue = std::move(queue);
 
     while (!_flags.Get(Flags::Stop)) {
-        if (_type == nullptr) {
-            _flags.Add(Flags::Idle);
-            _signal.acquire();
-			continue;
-        }
+		std::unique_lock type_lock(_type_mutex);
+		_flags.Add(Flags::Idle);
+
+		_cv.wait(type_lock, [this] {
+			return _type != nullptr || _flags.Get(Flags::Stop);
+		});
+
+		if (_flags.Get(Flags::Stop)) {
+			break;
+		}
 
         _flags.Clear(Flags::Idle);
         _task = _queue->GetNextTask(_type->GetTypeName());
+
         if (_task == nullptr) {
-            size_t subscription_id = _queue->SubscribeChanges([this]() { _signal.release(); }, _type->GetTypeName());
+			bool task_signalled = false;
+
+            _pending_subscription = _queue->SubscribeChangesOnce([this, &task_signalled]() {
+				std::scoped_lock lock (_type_mutex);
+				_pending_subscription = 0;
+				task_signalled = true;
+				_cv.notify_one();
+			}, _type->GetTypeName());
+
             _task = _queue->GetNextTask(_type->GetTypeName());
             if (_task == nullptr) {
                 _flags.Add(Flags::Idle);
-                _signal.acquire();
-                _queue->UnsubscribeChanges(subscription_id);
+				_cv.wait(type_lock, [this, &task_signalled] {
+					return task_signalled || _type == nullptr || _flags.Get(Flags::Stop);
+				});
+
+				if (_pending_subscription != 0) {
+					_queue->UnsubscribeChanges(_pending_subscription);
+					_pending_subscription = 0;
+				}
                 continue;
-            } else {
-                _queue->UnsubscribeChanges(subscription_id);
             }
         }
 
         _type->Process(_task, _logger.get(), _queue);
         _queue->TaskFinished(_task);
     }
+	if (_pending_subscription != 0) {
+		_queue->UnsubscribeChanges(_pending_subscription);
+	}
 }
 
 void Worker::SetType(std::unique_ptr<Hardware> type) {
+	std::scoped_lock type_lock(_type_mutex);
     if (_type != nullptr) {
         _type->Unload(_logger.get());
     }
     _type = std::move(type);
     _type->Load(_logger.get());
 	_flags.Clear(Flags::Idle);
-    _signal.release();
+	if (_pending_subscription != 0) {
+		_queue->UnsubscribeChanges(_pending_subscription);
+		_pending_subscription = 0;
+	}
+	_cv.notify_one();
 }
 
 void Worker::Stop() {
     _flags.Add(Flags::Stop);
-	_signal.release();
+	_cv.notify_one();
 }
 
 bool Worker::GetIsIdle() {
