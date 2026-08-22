@@ -23,18 +23,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libtclap-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# darknet is built from source via CMake.  We use hank-ai/darknet (Stephane
+# Charette's own fork) rather than AlexeyAB/darknet because DarkHelp was written
+# against that fork: it does an unconditional '#include <darknet.hpp>' and calls
+# 'Darknet::create_yolo_heatmaps()', both of which only exist in this repo.
+#
+# CUDA is auto-detected (CheckLanguage), cuDNN + OpenCV come from apt, so there
+# is no vcpkg / OpenCV-from-source -- the build stays fast.  A newer cmake is
+# required (>=3.24) than what Ubuntu 22.04 ships by default.
 WORKDIR /opt/darknet
-RUN git clone --depth 1 https://github.com/AlexeyAB/darknet.git . \
-    && make -j 4 GPU=1 CUDNN=1 OPENCV=1 OPENMP=1 LIBSO=1 \
-    && cp libdarknet.so /usr/local/lib/libdarknet.so \
-    && cp include/darknet.h /usr/local/include/ \
-    && printf '#include <darknet.h>\n' > /usr/local/include/darknet.hpp \
+RUN curl -fsSL https://github.com/kitware/cmake/releases/download/v3.27.9/cmake-3.27.9-linux-x86_64.tar.gz | tar -xz --strip-components=1 -C /usr/local \
+    && git clone https://github.com/hank-ai/darknet.git . \
+    && cmake -B build -DCMAKE_BUILD_TYPE=Release \
+    && cmake --build build -j "$(nproc)" \
+    && cmake --install build \
     && ldconfig
 
 WORKDIR /opt/darkhelp
 RUN git clone --depth 1 https://github.com/stephanecharette/DarkHelp.git . \
-    && cmake -B build -DCMAKE_BUILD_TYPE=Release \
-    && cmake --build build -j 4 \
+    && cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/usr/local \
+    && cmake --build build -j "$(nproc)" \
     && cp "$(find . -name 'libdarkhelp.so' -maxdepth 2 | head -n1)" /usr/local/lib/libdarkhelp.so \
     && ldconfig
 
