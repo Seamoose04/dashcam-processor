@@ -41,7 +41,7 @@ RUN curl -fsSL https://github.com/kitware/cmake/releases/download/v3.27.9/cmake-
 
 WORKDIR /opt/darkhelp
 RUN git clone --depth 1 https://github.com/stephanecharette/DarkHelp.git . \
-    && cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/usr/local \
+    && cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/usr/local -DCMAKE_EXE_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs" \
     && cmake --build build -j "$(nproc)" \
     && cp "$(find . -name 'libdarkhelp.so' -maxdepth 2 | head -n1)" /usr/local/lib/libdarkhelp.so \
     && ldconfig
