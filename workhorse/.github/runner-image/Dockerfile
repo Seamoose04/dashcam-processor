@@ -8,10 +8,10 @@
 #
 # Build:  docker build -t dashcam-runner .
 # Run:    docker run --gpus all -e RUNNER_TOKEN=<...> -d ghcr.io/.../dashcam-runner:latest
-FROM nvidia/cuda:12.6.2-cudnn8-ubuntu22.04
+FROM nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
-    CUDA_VERSION=12.6.2
+    CUDA_VERSION=12.6.3
 
 # System + build deps. OpenCV4 and tesseract are the only apt packages;
 # darknet + darkhelp are built from source (DarkHelp dropped vcpkg support).
