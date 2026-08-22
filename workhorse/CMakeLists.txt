@@ -10,6 +10,16 @@ endif()
 
 include(FetchContent)
 
+# dotenv — vendored single-header .env loader (pinned to v0.1.0).
+# FetchContent_Populate downloads it at configure time WITHOUT building its
+# test target (that pulls googletest); we only need the header on disk.
+FetchContent_Declare(
+  dotenv
+  GIT_REPOSITORY https://github.com/SermetPekin/dotenv
+  GIT_TAG v0.1.0
+)
+FetchContent_Populate(dotenv)
+
 # Packages
 find_package(Threads REQUIRED)
 find_package(OpenCV	REQUIRED)
@@ -44,6 +54,7 @@ target_compile_options(Workhorse PRIVATE -g -fno-omit-frame-pointer)
 target_include_directories(Workhorse PUBLIC
 	${CMAKE_CURRENT_SOURCE_DIR}/src
 	${TESSERACT_INCLUDE_DIRS}
+	${dotenv_SOURCE_DIR}/include   # dotenv.h (fetched via FetchContent above)
 )
 
 # Libraries

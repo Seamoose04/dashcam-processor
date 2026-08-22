@@ -14,10 +14,7 @@
 #include "core/tui.h"
 
 int main() {
-    Config config;
-    config.LOG_LEVEL = Logger::Level::Info;
-    config.MAX_WORKERS = 64;
-	config.AVAILABLE_VRAM = 20.0f;
+    Config config = Config::load();
 
     Logger::Config logger_conf;
     logger_conf.level = config.LOG_LEVEL;
@@ -26,12 +23,18 @@ int main() {
 
     logger.Log(Logger::Level::Info, "Main::Info Initializing...\n");
 
+    // Print what we're running with (auto-detected where possible).
+    logger.Log(Logger::Level::Info, std::format(
+        "Main::Info config loaded_from_file={} | workers={} | available_vram_gb={:.1f} | log_level={}\n",
+        config.loaded_from_file, config.MAX_WORKERS, config.AVAILABLE_VRAM_GB,
+        Logger::LevelToString(config.LOG_LEVEL)));
+
     Logger::Config worker_logger_config;
     worker_logger_config.level = config.LOG_LEVEL;
     worker_logger_config.path = "logs/workers";
-	Logger::Config scheduler_logger_config;
-	scheduler_logger_config.level = config.LOG_LEVEL;
-	scheduler_logger_config.path = "logs/scheduler.txt";
+    Logger::Config scheduler_logger_config;
+    scheduler_logger_config.level = config.LOG_LEVEL;
+    scheduler_logger_config.path = "logs/scheduler.txt";
     Scheduler scheduler(config, worker_logger_config, scheduler_logger_config);
 
     logger.Log(Logger::Level::Info, std::format("Main::Info Spawned {} workers\n", config.MAX_WORKERS));
