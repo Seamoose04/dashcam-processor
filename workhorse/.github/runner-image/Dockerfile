@@ -34,7 +34,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /opt/darknet
 RUN curl -fsSL https://github.com/kitware/cmake/releases/download/v3.27.9/cmake-3.27.9-linux-x86_64.tar.gz | tar -xz --strip-components=1 -C /usr/local \
     && git clone https://github.com/hank-ai/darknet.git . \
-    && cmake -B build -DCMAKE_BUILD_TYPE=Release \
+    && cmake -B build -DCMAKE_BUILD_TYPE=Release -DDARKNET_CUDA_ARCHITECTURES="75" \
     && cmake --build build -j "$(nproc)" \
     && cmake --install build \
     && ldconfig
