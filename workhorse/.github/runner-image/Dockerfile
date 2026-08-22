@@ -27,6 +27,8 @@ WORKDIR /opt/darknet
 RUN git clone --depth 1 https://github.com/AlexeyAB/darknet.git . \
     && make -j 4 GPU=1 CUDNN=1 OPENCV=1 OPENMP=1 LIBSO=1 \
     && cp libdarknet.so /usr/local/lib/libdarknet.so \
+    && cp include/darknet.h /usr/local/include/ \
+    && printf '#include <darknet.h>\n' > /usr/local/include/darknet.hpp \
     && ldconfig
 
 WORKDIR /opt/darkhelp
