@@ -36,7 +36,14 @@ RUN git clone --depth 1 https://github.com/stephanecharette/DarkHelp.git . \
     && cp libdarkhelp.so /usr/local/lib/libdarkhelp.so \
     && ldconfig
 
+# GitHub Actions runner binary (baked in so the image is self-contained).
+RUN mkdir -p /opt/actions-runner \
+    && curl -sL https://github.com/actions/runner/releases/download/v2.336.0/actions-runner-linux-x64-2.336.0.tar.gz \
+         | tar -xz -C /opt/actions-runner
+
 # CUDA toolkit ships with nvml headers + the nvml library.
 ENV PATH="/opt/nvidia/cuda/bin:${PATH}"
 
-CMD ["tail", "-f", "/dev/null"]
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

@@ -1,0 +1,28 @@
+# Self-hosted GitHub Actions runner image with the "gpu" label.
+#
+#   1. Copy .env.example -> .env and fill in RUNNER_TOKEN + RUNNER_URL
+#      (RUNNER_TOKEN is a one-time registration token from:
+#       repo -> Settings -> Actions -> Runners -> New self-hosted runner)
+#   2. docker compose up -d
+#   3. Verify under the same settings page; jobs tagged `runs-on: gpu` will use it.
+services:
+  dashcam-runner:
+    image: ghcr.io/seamoose04/dashcam-runner:latest
+    container_name: dashcam-runner
+    restart: unless-stopped
+    environment:
+      - RUNNER_TOKEN=${RUNNER_TOKEN}
+      - RUNNER_URL=${RUNNER_URL}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      # Persist the runner's registration/config across rebuilds.
+      - runner-state:/opt/actions-runner
+
+volumes:
+  runner-state:
