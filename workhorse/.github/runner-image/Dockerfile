@@ -20,19 +20,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential yasm libgtk2.0-dev libmagic-dev \
         libopencv-dev opencv-data \
         libtesseract-dev tesseract-ocr \
+        libtclap-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/darknet
 RUN git clone --depth 1 https://github.com/AlexeyAB/darknet.git . \
     && sed -i 's/^GPU=0/GPU=1/; s^CUDNN=0^CUDNN=1^; s^OPENCV=0^OPENCV=1^; s^OPENMP=0^OPENMP=1^' Makefile \
-    && make -j "$$(nproc)" \
+    && make -j 4 \
     && cp lib/libdarknet.so /usr/local/lib/libdarknet.so \
     && ldconfig
 
 WORKDIR /opt/darkhelp
 RUN git clone --depth 1 https://github.com/stephanecharette/DarkHelp.git . \
     && cmake -B build -DCMAKE_BUILD_TYPE=Release \
-    && cmake --build build -j "$$(nproc)" \
+    && cmake --build build -j 4 \
     && cp libdarkhelp.so /usr/local/lib/libdarkhelp.so \
     && ldconfig
 
