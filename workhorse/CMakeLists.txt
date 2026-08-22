@@ -50,6 +50,14 @@ add_executable(Workhorse ${WORKHORSE_SOURCES})
 # Debugging
 target_compile_options(Workhorse PRIVATE -g -fno-omit-frame-pointer)
 
+# Standalone config-loader test (tests/test_config.cpp). Links only config.cpp +
+# logger.cpp so it needs NO GPU/OpenCV deps — runs even on a CPU-only runner.
+enable_testing()
+add_executable(config_test tests/test_config.cpp src/core/config.cpp src/core/logger.cpp)
+target_include_directories(config_test PRIVATE ${dotenv_SOURCE_DIR}/include)
+target_link_libraries(config_test PRIVATE Threads::Threads)
+add_test(NAME config_loader COMMAND config_test)
+
 # Include
 target_include_directories(Workhorse PUBLIC
 	${CMAKE_CURRENT_SOURCE_DIR}/src

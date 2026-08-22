@@ -1,0 +1,29 @@
+name: build
+
+on:
+  push:
+    branches: [main, feature/*]
+  pull_request:
+    branches: [main]
+
+# Runs on the self-hosted runner image in ./runner-image (label "gpu").
+# That runner has OpenCV4, tesseract, CUDA, darknet + darkhelp baked in.
+jobs:
+  build:
+    runs-on: gpu
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure (CMake)
+        working-directory: workhorse
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        working-directory: workhorse
+        run: cmake --build build -j "$$(nproc)"
+
+      - name: Test config loader
+        if: always()
+        working-directory: workhorse
+        run: ctest --output-on-failure
