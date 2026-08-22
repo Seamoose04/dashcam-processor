@@ -26,7 +26,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /opt/darknet
 RUN git clone --depth 1 https://github.com/AlexeyAB/darknet.git . \
     && sed -i 's/^GPU=0/GPU=1/; s^CUDNN=0^CUDNN=1^; s^OPENCV=0^OPENCV=1^; s^OPENMP=0^OPENMP=1^' Makefile \
-    && make -j 4 \
+    && make -j 4 SHARED=1 \
     && cp lib/libdarknet.so /usr/local/lib/libdarknet.so \
     && ldconfig
 
