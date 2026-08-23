@@ -34,21 +34,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /opt/darknet
 RUN curl -fsSL https://github.com/kitware/cmake/releases/download/v3.27.9/cmake-3.27.9-linux-x86_64.tar.gz | tar -xz --strip-components=1 -C /usr/local \
     && git clone https://github.com/hank-ai/darknet.git . \
-    && cmake -B build -DCMAKE_BUILD_TYPE=Release -DDARKNET_CUDA_ARCHITECTURES="75" \
+    && CUDASTUB_DIR=$(find /usr/local/cuda -name 'libcuda.so' -path '*/stubs/*' -print -quit) \
+    && ln -sf "$CUDASTUB_DIR/libcuda.so" "$(dirname "$CUDASTUB_DIR")/libcuda.so.1" \
+    && ldconfig \
+    && cmake -B build -DCMAKE_BUILD_TYPE=Release \
+        -DDARKNET_CUDA_ARCHITECTURES="75" \
+        -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-rpath-link=$(dirname "$CUDASTUB_DIR")" \
+        -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath-link=$(dirname "$CUDASTUB_DIR")" \
     && cmake --build build -j "$(nproc)" \
     && cmake --install build \
     && ldconfig
 
-# libdarknet.so references cuCtxGetCurrent, so executables linking it need
-# libcuda.so.1 resolvable at BUILD time. The -devel image ships only the stub
-# as /usr/local/cuda/lib64/stubs/libcuda.so; symlink it under its SONAME so the
-# linker resolves it (the real driver library is used at runtime on a GPU box).
-RUN ln -sf libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1 \
-    && ldconfig
-
 WORKDIR /opt/darkhelp
 RUN git clone --depth 1 https://github.com/stephanecharette/DarkHelp.git . \
-    && cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/usr/local -DCMAKE_EXE_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs" \
+    && CUDASTUB_DIR=$(find /usr/local/cuda -name 'libcuda.so' -path '*/stubs/*' -print -quit) \
+    && ldconfig \
+    && cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/usr/local \
+        -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-rpath-link=$(dirname "$CUDASTUB_DIR")" \
+        -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath-link=$(dirname "$CUDASTUB_DIR")" \
     && cmake --build build -j "$(nproc)" \
     && cp "$(find . -name 'libdarkhelp.so' -maxdepth 2 | head -n1)" /usr/local/lib/libdarkhelp.so \
     && ldconfig
