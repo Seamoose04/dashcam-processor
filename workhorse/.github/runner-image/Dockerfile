@@ -39,6 +39,13 @@ RUN curl -fsSL https://github.com/kitware/cmake/releases/download/v3.27.9/cmake-
     && cmake --install build \
     && ldconfig
 
+# libdarknet.so references cuCtxGetCurrent, so executables linking it need
+# libcuda.so.1 resolvable at BUILD time. The -devel image ships only the stub
+# as /usr/local/cuda/lib64/stubs/libcuda.so; symlink it under its SONAME so the
+# linker resolves it (the real driver library is used at runtime on a GPU box).
+RUN ln -sf libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1 \
+    && ldconfig
+
 WORKDIR /opt/darkhelp
 RUN git clone --depth 1 https://github.com/stephanecharette/DarkHelp.git . \
     && cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/usr/local -DCMAKE_EXE_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs" \
